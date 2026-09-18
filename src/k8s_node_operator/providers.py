@@ -129,26 +129,35 @@ class TestProvider(CloudProvider):
     """
     No-op cloud provider for testing and mocking.
     """
-    def __init__(self):
-        self.nodepool = Nodepool(
-            name="test-pool"
-        )
+    def __init__(self, logger: kopf.Logger):
+        self._entered = False
+        self._exited = False
+        self.log = logger
 
-    async def get_nodepool(self, min_node_count: int, max_node_count: int, current_node_count: int, target_min_node_count: int):
+    async def __aenter__(self):
+        self._entered = True
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        self._exited = True
+
+    async def get_nodepool(self, target_min_node_count: int):
         self.nodepool = Nodepool(
-            min_node_count=min_node_count,
-            max_node_count=max_node_count,
-            current_node_count=current_node_count,
-            target_min_node_count=target_min_node_count, 
+            name="test-pool",
+            min_node_count=0, 
+            max_node_count=0,
+            current_node_count=0,
+            target_min_node_count=target_min_node_count, # target_min_node_count is the only variable we are testing
         )
         return self.nodepool
 
-    async def set_min_node_count(self, min_node_count: int, max_node_count: int, current_node_count: int, target_min_node_count: int):
+    async def set_min_node_count(self, target_min_node_count: int):
         self.nodepool = Nodepool(
-            min_node_count=min_node_count,
-            max_node_count=max_node_count,
-            current_node_count=current_node_count,
-            target_min_node_count=target_min_node_count, 
+            name="test-nodepool",
+            min_node_count=0,
+            max_node_count=0,
+            current_node_count=0,
+            target_min_node_count=target_min_node_count, # target_min_node_count is the only variable we are testing
         )
         return self.nodepool
 
