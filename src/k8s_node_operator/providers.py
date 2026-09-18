@@ -73,7 +73,7 @@ class GCPProvider(CloudProvider):
         response = await self.client.get_node_pool(request=request)
         return response
 
-    async def get_nodepool(self, gcp_nodepool, current_node_count: int | None, target_min_node_count: int):
+    async def get_nodepool(self, gcp_nodepool, current_node_count: int, target_min_node_count: int):
         if not gcp_nodepool:
             gcp_nodepool = await self._get_gcp_nodepool()
         current_node_count = await self.get_k8s_current_node_count()
@@ -132,6 +132,7 @@ class TestProvider(CloudProvider):
     def __init__(self, logger: kopf.Logger):
         self._entered = False
         self._exited = False
+        self.nodepool = "test-nodepool"
         self.log = logger
 
     async def __aenter__(self):

@@ -31,6 +31,10 @@ spec:
         type: string
         description: Nodepool name
         jsonPath: .status.nodepool_allocation.name
+      - name: Status
+        type: string
+        description: Nodepool allocation target status
+        jsonPath: .status.nodepool_allocation.status
       - name: Node count
         type: integer
         description: Current node count

@@ -14,5 +14,5 @@ async def nodepool_allocation(spec: kopf.Spec, name: str, namespace: str | None,
     provider_name = os.environ.get("K8S_NODE_OPERATOR_CLOUD_PROVIDER")
     async with create_provider(name=provider_name, logger=logger) as provider:
         nodepool = await provider.set_min_node_count(target_min_node_count=target_min_node_count)
-    # Store returned output into npat object
-    return {'status': 'SUCCESS', 'name': nodepool.name, 'node_count': nodepool.current_node_count, 'min_node_count': nodepool.min_node_count, 'max_node_count': nodepool.max_node_count, 'target_min_node_count': nodepool.target_min_node_count} # type: ignore
+    # Store output in k8s npat object
+    return {'status': 'READY', 'name': nodepool.name, 'node_count': nodepool.current_node_count, 'min_node_count': nodepool.min_node_count, 'max_node_count': nodepool.max_node_count, 'target_min_node_count': nodepool.target_min_node_count} # type: ignore
