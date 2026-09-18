@@ -3,13 +3,21 @@ import google.api_core
 import kopf
 import os
 from dataclasses import dataclass
+from enum import Enum
 from google.cloud import container_v1
 from kubernetes.aio import client, config
 from kubernetes.aio.client.api_client import ApiClient
 from typing import Protocol
 
+class NodepoolStatus(Enum):
+    READY = 1
+    UPDATING = 2
+    ERROR = 3
+
+
 @dataclass
 class Nodepool:
+    status: NodepoolStatus
     name: str
     min_node_count: int
     max_node_count: int
@@ -73,11 +81,11 @@ class GCPProvider(CloudProvider):
         response = await self.client.get_node_pool(request=request)
         return response
 
-    async def get_nodepool(self, gcp_nodepool, current_node_count: int, target_min_node_count: int):
+    async def get_nodepool(self, target_min_node_count: int, gcp_nodepool: container_v1.NodePool | None = None):
         if not gcp_nodepool:
             gcp_nodepool = await self._get_gcp_nodepool()
         current_node_count = await self.get_k8s_current_node_count()
-        nodepool = Nodepool(name=self.nodepool, min_node_count=gcp_nodepool.autoscaling.min_node_count, max_node_count=gcp_nodepool.autoscaling.max_node_count, current_node_count=current_node_count,
+        nodepool = Nodepool(status=NodepoolStatus.READY, name=self.nodepool, min_node_count=gcp_nodepool.autoscaling.min_node_count, max_node_count=gcp_nodepool.autoscaling.max_node_count, current_node_count=current_node_count,
         target_min_node_count=target_min_node_count)
         return nodepool
 
@@ -120,8 +128,7 @@ class GCPProvider(CloudProvider):
             self.log.info(f'Minimum node count set to {gcp_nodepool.autoscaling.min_node_count}.')
         else:
             self.log.warning(f'Minimum node count is already set to {target_min_node_count}.')
-        current_node_count = await self.get_k8s_current_node_count()
-        nodepool = await self.get_nodepool(gcp_nodepool=gcp_nodepool, current_node_count=current_node_count, target_min_node_count=target_min_node_count)
+        nodepool = await self.get_nodepool(gcp_nodepool=gcp_nodepool, target_min_node_count=target_min_node_count)
         self.log.debug(f'{nodepool=}')
         return nodepool
 
