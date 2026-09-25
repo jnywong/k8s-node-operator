@@ -49,13 +49,11 @@ class GCPProvider(CloudProvider):
     """
     Methods for Google Cloud Platform (GCP).
     """
-    def __init__(self, nodepool: str, logger: kopf.Logger | None = None):
-        self.cluster_name = os.environ.get("GCP_CLUSTER", "")
-        self.machine_type = os.environ.get("GCP_MACHINE_TYPE", "")
-        self.project_name = os.environ.get("GCP_PROJECT_ID", "")
-        self.zone = os.environ.get("GCP_ZONE", "") # TODO: add support for regional clusters
-        self.region = os.environ.get("GCP_REGION", "")
-        self.nodepool = nodepool
+    def __init__(self, spec: kopf.Spec, logger: kopf.Logger | None = None):
+        self.project_name = spec.get("project")
+        self.cluster_name = spec.get("cluster")
+        self.zone = spec.get("zone") # TODO: add support for regional clusters
+        self.nodepool = spec.get("nodepool")
         self.prefix =  f"projects/{self.project_name}/zones/{self.zone}" if self.zone else f"projects/{self.project_name}/region/{self.region}"
         self.nodepool_name = self.prefix + f"/clusters/{self.cluster_name}/nodePools/{self.nodepool}"
         self.credentials_file = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
@@ -173,8 +171,8 @@ class TestProvider(CloudProvider):
         return self.nodepool
 
 
-def create_provider(name: str, nodepool: str, logger: kopf.Logger):
+def create_provider(name: str, spec: kopf.Spec, logger: kopf.Logger):
     if name == "GCP":
-        return GCPProvider(nodepool = nodepool, logger=logger)
+        return GCPProvider(spec=spec, logger=logger)
     elif name == "TEST":
-        return TestProvider(nodepool = nodepool, logger=logger)
+        return TestProvider(logger=logger)

@@ -3,5 +3,9 @@ kind: NodepoolAllocationTarget
 metadata:
   name: example-npat
 spec:
-  minimumNodeCount: 1
-  nodepool: 'default-pool'
+  project: '<project_name>'
+  cluster: '<cluster_name>'
+  zone: '<zone_name>'
+  nodepool: '<pool_name>'
+  minimumNodeCount: 0
+  
