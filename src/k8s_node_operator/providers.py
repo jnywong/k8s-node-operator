@@ -9,7 +9,7 @@ from kubernetes.aio import client, config
 from kubernetes.aio.client.api_client import ApiClient
 from typing import Protocol
 
-class NodepoolStatus(Enum):
+class NodepoolState(Enum):
     READY = 1
     UPDATING = 2
     ERROR = 3
@@ -17,7 +17,7 @@ class NodepoolStatus(Enum):
 
 @dataclass
 class Nodepool:
-    status: NodepoolStatus
+    state: NodepoolState
     name: str
     min_node_count: int
     max_node_count: int
@@ -49,7 +49,7 @@ class GCPProvider(CloudProvider):
     """
     Methods for Google Cloud Platform (GCP).
     """
-    def __init__(self, logger: kopf.Logger):
+    def __init__(self, logger: kopf.Logger | None = None):
         self.cluster_name = os.environ.get("GCP_CLUSTER", "")
         self.machine_type = os.environ.get("GCP_MACHINE_TYPE", "")
         self.nodepool = os.environ.get("GCP_NODEPOOL", "") # TODO: get this from the npat spec
@@ -61,8 +61,9 @@ class GCPProvider(CloudProvider):
         self.credentials_file = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
         self.credentials, self.project = google.auth.default()
         self.client = None
-        self.log = logger
-        self.log.debug(self.credentials.get_cred_info())
+        if logger:
+            self.log = logger
+            self.log.debug(self.credentials.get_cred_info())
 
     async def __aenter__(self):
         self.client = container_v1.ClusterManagerAsyncClient(
@@ -85,7 +86,7 @@ class GCPProvider(CloudProvider):
         if not gcp_nodepool:
             gcp_nodepool = await self._get_gcp_nodepool()
         current_node_count = await self.get_k8s_current_node_count()
-        nodepool = Nodepool(status=NodepoolStatus.READY, name=self.nodepool, min_node_count=gcp_nodepool.autoscaling.min_node_count, max_node_count=gcp_nodepool.autoscaling.max_node_count, current_node_count=current_node_count,
+        nodepool = Nodepool(state=NodepoolState.UPDATING.name, name=self.nodepool, min_node_count=gcp_nodepool.autoscaling.min_node_count, max_node_count=gcp_nodepool.autoscaling.max_node_count, current_node_count=current_node_count,
         target_min_node_count=target_min_node_count)
         return nodepool
 
@@ -119,7 +120,11 @@ class GCPProvider(CloudProvider):
                 name=self.nodepool_name,
                 autoscaling=gcp_nodepool_autoscaling
             )
-            operation = await self.client.set_node_pool_autoscaling(request=request)
+            try:
+                operation = await self.client.set_node_pool_autoscaling(request=request)
+            except google.api_core.exceptions.FailedPrecondition as e:
+                # Kopf will retry the handler again
+                raise kopf.TemporaryError(f"{e}")
             # Block until scaling operation is completed
             if operation:
                 await self.wait_gcp_operation(operation_name = operation.name)
@@ -129,7 +134,6 @@ class GCPProvider(CloudProvider):
         else:
             self.log.warning(f'Minimum node count is already set to {target_min_node_count}.')
         nodepool = await self.get_nodepool(gcp_nodepool=gcp_nodepool, target_min_node_count=target_min_node_count)
-        self.log.debug(f'{nodepool=}')
         return nodepool
 
 class TestProvider(CloudProvider):

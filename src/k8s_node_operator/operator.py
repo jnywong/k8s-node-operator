@@ -1,7 +1,7 @@
 import kopf
 import os
 from typing import Any, Dict
-from k8s_node_operator.providers import create_provider
+from k8s_node_operator.providers import create_provider, NodepoolState
 
 @kopf.on.create('nodepoolallocationtarget')
 @kopf.on.update('nodepoolallocationtarget')
@@ -10,12 +10,14 @@ async def nodepool_allocation(spec: kopf.Spec, name: str, namespace: str | None,
     target_min_node_count = spec.get('minimumNodeCount')
     if not target_min_node_count:
         target_min_node_count = 0
-    # Send nodepool scaling request to cloud provider
+    # Determine cloud provider
     provider_name = os.environ.get("K8S_NODE_OPERATOR_CLOUD_PROVIDER")
     async with create_provider(name=provider_name, logger=logger) as provider:
+        # Set minimum node count
         nodepool = await provider.set_min_node_count(target_min_node_count=target_min_node_count)
-    # Store output in k8s npat object
-    return {'status': nodepool.status.name, 'name': nodepool.name, 'node_count': nodepool.current_node_count, 'min_node_count': nodepool.min_node_count, 'max_node_count': nodepool.max_node_count, 'target_min_node_count': nodepool.target_min_node_count}
+        logger.info(f"{nodepool=}")
+        # Store output in k8s npat object
+        return {'state': NodepoolState.READY.name, 'name': nodepool.name, 'node_count': nodepool.current_node_count, 'min_node_count': nodepool.min_node_count, 'max_node_count': nodepool.max_node_count, 'target_min_node_count': nodepool.target_min_node_count}
 
 @kopf.on.delete('nodepoolallocationtarget')
 async def delete_nodepool_allocation(logger: kopf.Logger, **_: Any) -> None:
