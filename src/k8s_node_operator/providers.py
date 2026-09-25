@@ -28,6 +28,16 @@ class CloudProvider(Protocol):
     """
     Abstract class that allows structural subtyping/duck typing of all cloud providers (see https://typing.python.org/en/latest/reference/protocols.html).
     """
+    def __init__(self, logger: kopf.Logger, npat_name: str | None = None):
+        self.group = 'jupyter.org'
+        self.version = 'v1'
+        self.plural = 'nodepoolallocationtargets'
+        self.name = npat_name or None
+        if logger:
+            self.log = logger
+        else:
+            print('No kopf logger detected.')
+
     async def get_nodepool(self):
         ... # Note that `...` is a Python placeholder object
 
@@ -44,12 +54,30 @@ class CloudProvider(Protocol):
             node_list = await v1.list_node()
         node_count = len(node_list.items)
         return node_count
+
+    async def update_k8s_object_status(self, body: dict):
+        await config.load_kube_config()
+        async with ApiClient() as api:
+            v1 = client.CustomObjectsApi(api)
+            try:
+                await v1.patch_cluster_custom_object(
+                    group=self.group,
+                    version=self.version,
+                    plural=self.plural,
+                    name=self.name,
+                    body=body,
+                    _content_type="application/merge-patch+json"
+                )
+                self.log.debug(f'{self.name} status patched.')
+            except Exception as e:
+                self.log.warning(f"{e}")
         
 class GCPProvider(CloudProvider):
     """
     Methods for Google Cloud Platform (GCP).
     """
-    def __init__(self, spec: kopf.Spec, logger: kopf.Logger | None = None):
+    def __init__(self, spec: kopf.Spec, npat_name: str, logger: kopf.Logger | None = None):
+        super().__init__(logger=logger, npat_name = npat_name)
         self.project_name = spec.get("project") or os.environ.get("GCP_PROJECT_ID")
         self.cluster_name = spec.get("cluster") or os.environ.get("GCP_CLUSTER")
         self.zone = spec.get("zone") or os.environ.get("GCP_ZONE") # TODO: add support for regional clusters
@@ -58,10 +86,8 @@ class GCPProvider(CloudProvider):
         self.nodepool_name = self.prefix + f"/clusters/{self.cluster_name}/nodePools/{self.nodepool}"
         self.credentials_file = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
         self.credentials, self.project = google.auth.default()
+        self.log.debug(self.credentials.get_cred_info())
         self.client = None
-        if logger:
-            self.log = logger
-            self.log.debug(self.credentials.get_cred_info())
 
     async def __aenter__(self):
         self.client = container_v1.ClusterManagerAsyncClient(
@@ -105,6 +131,19 @@ class GCPProvider(CloudProvider):
 
     async def set_min_node_count(self, target_min_node_count: int):
         gcp_nodepool = await self._get_gcp_nodepool()
+        await self.update_k8s_object_status(
+            body={
+                "status": {
+                    "nodepool_allocation": {
+                        "state": NodepoolState.UPDATING.name,
+                        "name": self.name,
+                        "min_node_count": gcp_nodepool.autoscaling.min_node_count,
+                        "max_node_count": gcp_nodepool.autoscaling.max_node_count,
+                        "target_min_node_count": target_min_node_count
+                    }
+                }
+            }
+        )
         if target_min_node_count >= gcp_nodepool.autoscaling.max_node_count:
             self.log.warning(f'Target minimum node count {target_min_node_count} exceeds maximum node count.')
         elif target_min_node_count != gcp_nodepool.autoscaling.min_node_count:
@@ -138,10 +177,10 @@ class TestProvider(CloudProvider):
     """
     No-op cloud provider for testing and mocking.
     """
-    def __init__(self, nodepool: str, logger: kopf.Logger):
+    def __init__(self, npat_name: str, logger: kopf.Logger):
+        super().__init__(npat_name=npat_name, logger=logger)
         self._entered = False
         self._exited = False
-        self.log = logger
 
     async def __aenter__(self):
         self._entered = True
@@ -171,8 +210,8 @@ class TestProvider(CloudProvider):
         return self.nodepool
 
 
-def create_provider(name: str, spec: kopf.Spec, logger: kopf.Logger):
+def create_provider(name: str, spec: kopf.Spec, npat_name: str, logger: kopf.Logger):
     if name == "GCP":
-        return GCPProvider(spec=spec, logger=logger)
+        return GCPProvider(spec=spec, npat_name = npat_name, logger=logger)
     elif name == "TEST":
-        return TestProvider(logger=logger)
+        return TestProvider(npat_name = npat_name, logger=logger)
