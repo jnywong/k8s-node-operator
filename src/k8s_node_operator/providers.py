@@ -49,13 +49,13 @@ class GCPProvider(CloudProvider):
     """
     Methods for Google Cloud Platform (GCP).
     """
-    def __init__(self, logger: kopf.Logger | None = None):
+    def __init__(self, nodepool: str, logger: kopf.Logger | None = None):
         self.cluster_name = os.environ.get("GCP_CLUSTER", "")
         self.machine_type = os.environ.get("GCP_MACHINE_TYPE", "")
-        self.nodepool = os.environ.get("GCP_NODEPOOL", "") # TODO: get this from the npat spec
         self.project_name = os.environ.get("GCP_PROJECT_ID", "")
         self.zone = os.environ.get("GCP_ZONE", "") # TODO: add support for regional clusters
         self.region = os.environ.get("GCP_REGION", "")
+        self.nodepool = nodepool
         self.prefix =  f"projects/{self.project_name}/zones/{self.zone}" if self.zone else f"projects/{self.project_name}/region/{self.region}"
         self.nodepool_name = self.prefix + f"/clusters/{self.cluster_name}/nodePools/{self.nodepool}"
         self.credentials_file = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
@@ -140,10 +140,9 @@ class TestProvider(CloudProvider):
     """
     No-op cloud provider for testing and mocking.
     """
-    def __init__(self, logger: kopf.Logger):
+    def __init__(self, nodepool: str, logger: kopf.Logger):
         self._entered = False
         self._exited = False
-        self.nodepool = "test-nodepool"
         self.log = logger
 
     async def __aenter__(self):
@@ -174,8 +173,8 @@ class TestProvider(CloudProvider):
         return self.nodepool
 
 
-def create_provider(name: str, logger: kopf.Logger):
+def create_provider(name: str, nodepool: str, logger: kopf.Logger):
     if name == "GCP":
-        return GCPProvider(logger=logger)
+        return GCPProvider(nodepool = nodepool, logger=logger)
     elif name == "TEST":
-        return TestProvider(logger=logger)
+        return TestProvider(nodepool = nodepool, logger=logger)

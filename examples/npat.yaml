@@ -4,3 +4,4 @@ metadata:
   name: example-npat
 spec:
   minimumNodeCount: 1
+  nodepool: 'default-pool'
