@@ -50,10 +50,10 @@ class GCPProvider(CloudProvider):
     Methods for Google Cloud Platform (GCP).
     """
     def __init__(self, spec: kopf.Spec, logger: kopf.Logger | None = None):
-        self.project_name = spec.get("project")
-        self.cluster_name = spec.get("cluster")
-        self.zone = spec.get("zone") # TODO: add support for regional clusters
-        self.nodepool = spec.get("nodepool")
+        self.project_name = spec.get("project") or os.environ.get("GCP_PROJECT_ID")
+        self.cluster_name = spec.get("cluster") or os.environ.get("GCP_CLUSTER")
+        self.zone = spec.get("zone") or os.environ.get("GCP_ZONE") # TODO: add support for regional clusters
+        self.nodepool = spec.get("nodepool") or os.environ.get("GCP_NODEPOOL")
         self.prefix =  f"projects/{self.project_name}/zones/{self.zone}" if self.zone else f"projects/{self.project_name}/region/{self.region}"
         self.nodepool_name = self.prefix + f"/clusters/{self.cluster_name}/nodePools/{self.nodepool}"
         self.credentials_file = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
