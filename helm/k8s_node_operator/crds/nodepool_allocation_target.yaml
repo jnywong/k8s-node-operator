@@ -38,15 +38,15 @@ spec:
       - name: Node count
         type: integer
         description: Current node count
-        jsonPath: .status.nodepool_allocation.node_count
-      - name: Min node count
-        type: integer
-        description: Minimum node count
-        jsonPath: .status.nodepool_allocation.min_node_count
+        jsonPath: .status.nodepool_allocation.current_node_count
       - name: Target Min node count
         type: integer
         description: Target minimum node count
         jsonPath: .status.nodepool_allocation.target_min_node_count
+      - name: Min node count
+        type: integer
+        description: Minimum node count
+        jsonPath: .status.nodepool_allocation.min_node_count
       - name: Max node count
         type: integer
         description: Maximum node count
