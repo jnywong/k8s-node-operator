@@ -46,7 +46,6 @@ dependencies = [
     "kopf~=1.44",
     "kubernetes~=36.0",
     "google-cloud-container~=2.65",
-    "traitlets~=5.0"
 ]
 
 [project.urls]
@@ -149,7 +148,7 @@ dependencies = [
 ]
 
 [tool.hatch.envs.install]
-description = """Test the installation the package."""
+description = """Test the installation of the package."""
 dependencies = [
     "pip",
     "twine",

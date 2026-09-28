@@ -3,14 +3,8 @@ import pytest
 import subprocess
 import time
 from kopf.testing import KopfRunner
-from pathlib import Path
+from .conftest import SRC_DIR
 from .utils import generate_test_npat_file
-
-# test_operator.py assumes that the npat CRD is already installed with kubectl apply -f helm/k8s_node_operator/nodepool_allocation_target.yaml. Make sure that no npat objects already exist in your k8s cluster prior to running the test suite.
-
-# Path to kopf operator 
-PROJECT_DIR = Path(__file__).parent.parent
-SRC_DIR = PROJECT_DIR.joinpath('src/k8s_node_operator')
 
 # Use no-op cloud provider for testing
 os.environ["K8S_NODE_OPERATOR_CLOUD_PROVIDER"] = "TEST"
@@ -46,3 +40,9 @@ def test_npat_create_update_and_delete():
     assert "'spec': {'minimumNodeCount': '0'}" in runner.output
     assert "'spec': {'minimumNodeCount': '1'}" in runner.output
     assert 'Deleted, really deleted' in runner.output
+
+
+# TODO:
+# - when current node count < target => timeout and that timeout and status is respected
+# - label selector is passed through
+# - k8s object status is updated where expected
