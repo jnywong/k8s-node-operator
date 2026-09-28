@@ -8,7 +8,7 @@ from enum import Enum
 from google.cloud import container_v1
 from kubernetes.aio import client, config
 from kubernetes.aio.client.api_client import ApiClient
-from typing import Protocol
+from abc import ABC
 
 class NodepoolState(Enum):
     READY = 1
@@ -18,16 +18,18 @@ class NodepoolState(Enum):
 
 @dataclass
 class Nodepool:
-    state: NodepoolState
+    state: str
     name: str
     min_node_count: int
     max_node_count: int
     current_node_count: int
     target_min_node_count: int
 
-class CloudProvider(Protocol):
+type NodepoolType = container_v1.NodePool | None
+
+class CloudProvider(ABC):
     """
-    Abstract class that allows structural subtyping/duck typing of all cloud providers (see https://typing.python.org/en/latest/reference/protocols.html).
+    Abstract base class that standardizes the construction of all cloud providers (see https://peps.python.org/pep-3119/).
     """
     def __init__(self, logger: kopf.Logger | None = None, npat_name: str | None = None, timeout: int = 300, interval: int = 10):
         self.group = 'jupyter.org'
@@ -41,10 +43,10 @@ class CloudProvider(Protocol):
         else:
             print('No kopf logger detected.')
 
-    async def get_nodepool(self):
+    async def get_nodepool(self, target_min_node_count: int, nodepool: NodepoolType = None):
         ... # Note that `...` is a Python placeholder object
 
-    async def set_min_node_count(self, min_node_count: int, nodepool: Nodepool):
+    async def set_min_node_count(self, min_node_count: int):
         ...
 
     async def get_k8s_current_node_count(self, label_selector: str):
@@ -66,6 +68,9 @@ class CloudProvider(Protocol):
         return node_count
 
     async def update_k8s_object_status(self, body: dict):
+        """
+        Patch object status of a Kubernetes custom resource.
+        """
         await config.load_kube_config()
         async with ApiClient() as api:
             v1 = client.CustomObjectsApi(api)
@@ -91,14 +96,14 @@ class GCPProvider(CloudProvider):
         self.project_name = spec.get("project") or os.environ.get("GCP_PROJECT_ID")
         self.cluster_name = spec.get("cluster") or os.environ.get("GCP_CLUSTER")
         self.zone = spec.get("zone") or os.environ.get("GCP_ZONE") # TODO: add support for regional clusters
-        self.nodepool = spec.get("nodepool") or os.environ.get("GCP_NODEPOOL")
-        self.nodepool_label = spec.get("nodepoolLabel") or os.environ.get("GCP_NODEPOOL_LABEL")
+        self.region = spec.get("region") or os.environ.get("GCP_REGION") # TODO: add support for regional clusters
+        self.nodepool = spec.get("nodepool", "") or os.environ.get("GCP_NODEPOOL", "")
+        self.nodepool_label = spec.get("nodepoolLabel", "") or os.environ.get("GCP_NODEPOOL_LABEL", "")
         self.prefix =  f"projects/{self.project_name}/zones/{self.zone}" if self.zone else f"projects/{self.project_name}/region/{self.region}"
         self.nodepool_name = self.prefix + f"/clusters/{self.cluster_name}/nodePools/{self.nodepool}"
         self.credentials_file = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
         self.credentials, self.project = google.auth.default()
         self.log.debug(self.credentials.get_cred_info())
-        self.client = None
 
     async def __aenter__(self):
         self.client = container_v1.ClusterManagerAsyncClient(
@@ -107,8 +112,7 @@ class GCPProvider(CloudProvider):
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
-        if self.client:
-            await self.client.transport.close()
+        await self.client.transport.close()
 
     async def _get_gcp_nodepool(self):
         request = container_v1.GetNodePoolRequest(
@@ -117,7 +121,7 @@ class GCPProvider(CloudProvider):
         response = await self.client.get_node_pool(request=request)
         return response
 
-    async def get_nodepool(self, target_min_node_count: int, gcp_nodepool: container_v1.NodePool | None = None):
+    async def get_nodepool(self, target_min_node_count: int, gcp_nodepool: NodepoolType = None):
         if not gcp_nodepool:
             gcp_nodepool = await self._get_gcp_nodepool()
         current_node_count = await self.get_k8s_current_node_count(self.nodepool_label)
@@ -142,7 +146,7 @@ class GCPProvider(CloudProvider):
 
     async def set_min_node_count(self, target_min_node_count: int):
         # Update npat with current nodepool state
-        gcp_nodepool = await self._get_gcp_nodepool()
+        gcp_nodepool = await self._get_gcp_nodepool() # We deal with the GCP nodepool object here since we will pass that into the GCP request later
         current_node_count = await self.get_k8s_current_node_count(label_selector=self.nodepool_label)
         await self.update_k8s_object_status(
             body={
@@ -175,7 +179,7 @@ class GCPProvider(CloudProvider):
             try:
                 operation = await self.client.set_node_pool_autoscaling(request=request)
             except google.api_core.exceptions.FailedPrecondition as e:
-                # Kopf will retry the handler again on TemporaryError
+                # This can happen e.g. if nodepool state is already busy running another operation.
                 await self.update_k8s_object_status(
                     body={
                         "status": {
@@ -190,8 +194,9 @@ class GCPProvider(CloudProvider):
                         }
                     }
                 )
+                # Kopf will retry the handler again on TemporaryError
                 raise kopf.TemporaryError(f"{e}")
-            # Block until scaling operation is completed
+            # Block until current scaling operation is completed
             if operation:
                 await self.wait_gcp_operation(operation_name = operation.name)
             # Update with new nodepool state
@@ -238,7 +243,7 @@ class GCPProvider(CloudProvider):
                 }
             }
         )
-        raise kopf.PermanentError(f"Timed out waiting for at least {target_min_node_count} nodes in nodepool {self.nodepool_label}. Current node count: {nodepool.current_node_count}.")
+        raise kopf.PermanentError(f"Timed out after {self.timeout} seconds waiting for at least {target_min_node_count} nodes in nodepool with label '{self.nodepool_label}'. Current node count = {nodepool.current_node_count}.")
 
 class TestProvider(CloudProvider):
     """
@@ -256,9 +261,10 @@ class TestProvider(CloudProvider):
     async def __aexit__(self, exc_type, exc, tb):
         self._exited = True
 
-    async def get_nodepool(self, target_min_node_count: int):
+    async def get_nodepool(self, target_min_node_count: int, nodepool = None):
         self.nodepool = Nodepool(
             name="test-pool",
+            state=NodepoolState.READY.name,
             min_node_count=0, 
             max_node_count=0,
             current_node_count=0,
@@ -269,6 +275,7 @@ class TestProvider(CloudProvider):
     async def set_min_node_count(self, target_min_node_count: int):
         self.nodepool = Nodepool(
             name="test-nodepool",
+            state=NodepoolState.READY.name,
             min_node_count=0,
             max_node_count=0,
             current_node_count=0,
@@ -282,6 +289,8 @@ def create_provider(name: str, spec: kopf.Spec, npat_name: str, logger: kopf.Log
         return GCPProvider(spec=spec, npat_name = npat_name, logger=logger)
     elif name == "TEST":
         return TestProvider(npat_name = npat_name, logger=logger)
+    else:
+        raise ValueError(f"Provider name '{name}' not recognized.")
 
 # TODO:
 # - add npat labels to select upon
