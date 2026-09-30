@@ -2,6 +2,7 @@ import asyncio
 import google.auth
 import google.api_core
 import kopf
+import logging
 import os
 from dataclasses import dataclass
 from enum import Enum
@@ -31,7 +32,7 @@ class CloudProvider(ABC):
     """
     Abstract base class that standardizes the construction of all cloud providers (see https://peps.python.org/pep-3119/).
     """
-    def __init__(self, logger: kopf.Logger | None = None, npat_name: str | None = None, timeout: int = 300, interval: int = 10):
+    def __init__(self, logger: kopf.Logger | logging.Logger | None = None, npat_name: str | None = None, timeout: int = 300, interval: int = 10):
         self.group = 'jupyter.org'
         self.version = 'v1'
         self.plural = 'nodepoolallocationtargets'
@@ -66,6 +67,25 @@ class CloudProvider(ABC):
             )
         )
         return node_count
+
+    async def get_k8s_object_status(self):
+        """
+        Get object status of a Kubernetes custom resource.
+        """
+        await config.load_kube_config()
+        async with ApiClient() as api:
+            v1 = client.CustomObjectsApi(api)
+            try:
+                obj = await v1.get_cluster_custom_object(
+                    group=self.group,
+                    version=self.version,
+                    plural=self.plural,
+                    name=self.name
+                )
+                return obj["status"]
+            except Exception as e:
+                self.log.warning(f"{e}")
+                raise
 
     async def update_k8s_object_status(self, body: dict):
         """
@@ -284,7 +304,7 @@ class TestProvider(CloudProvider):
         return self.nodepool
 
 
-def create_provider(name: str, spec: kopf.Spec, npat_name: str, logger: kopf.Logger):
+def create_provider(name: str,  npat_name: str | None = None, spec: kopf.Spec | None = None, logger: kopf.Logger | logging.Logger | None = None) -> CloudProvider:
     if name == "GCP":
         return GCPProvider(spec=spec, npat_name = npat_name, logger=logger)
     elif name == "TEST":
