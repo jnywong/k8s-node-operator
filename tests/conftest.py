@@ -2,6 +2,7 @@ import logging
 import pytest
 import subprocess
 from pathlib import Path
+from k8s_node_operator.providers import create_provider
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,12 @@ def create_kind_cluster():
         ["kubectl", "apply", "-f", CRD_FILE],
         check=True
     )
-    check_crd()
+    # Assert npat crd is installed
+    output = subprocess.check_output(
+      ["kubectl", "get", "crds"]
+    )
+    assert "nodepoolallocationtargets.jupyter.org" in output.decode('utf-8')
+    # Yield and delete when done
     try:
         yield
     finally:
@@ -30,8 +36,9 @@ def create_kind_cluster():
           check=True
         )
 
-def check_crd():
-    output = subprocess.check_output(
-      ["kubectl", "get", "crds"]
-    )
-    assert "nodepoolallocationtargets.jupyter.org" in output.decode('utf-8')
+# Use no-op cloud provider for testing
+# Note: kopfRunner instantiates provider within the handler, but we provider another instance as a fixture for test assertions
+@pytest.fixture(scope='session', autouse=True)
+def provider():
+    provider = create_provider(name="TEST", logger=logger)
+    yield provider
