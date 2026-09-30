@@ -63,7 +63,7 @@ class CloudProvider(ABC):
     async def load_kubernetes_config(self):
         try:
             # Load config from production k8s environment
-            await config.load_incluster_config()
+            config.load_incluster_config()
         except config.ConfigException:
             # Load config from local k8s environment
             await config.load_kube_config()
