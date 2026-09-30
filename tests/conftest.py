@@ -38,7 +38,7 @@ def create_kind_cluster():
         )
 
 # Use no-op cloud provider for testing
-# Note: kopfRunner instantiates provider within the handler, but we provider another instance as a fixture for test assertions
+# Note: kopfRunner instantiates provider within the handler, but we provide another instance as a fixture for test assertions
 @pytest.fixture(scope='session', autouse=True)
 def provider():
     provider = create_provider(name="TEST", npat_name="test-npat", spec=kopf.Spec, logger=logger)

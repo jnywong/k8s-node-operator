@@ -60,11 +60,19 @@ class CloudProvider(ABC):
     async def set_min_node_count(self, min_node_count: int):
         ...
 
+    async def load_kubernetes_config(self):
+        try:
+            # Load config from production k8s environment
+            await config.load_incluster_config()
+        except config.ConfigException:
+            # Load config from local k8s environment
+            await config.load_kube_config()
+
     async def get_k8s_current_node_count(self, label_selector: str):
         """
         Get current node count with 'Ready' status of nodepool by label selectors with the Kubernetes API. We use this as the source of truth for the number of nodes available, rather than through cloud provider specific APIs.
         """
-        await config.load_kube_config()
+        await self.load_kubernetes_config()
         async with ApiClient() as api:
             v1 = client.CoreV1Api(api)
             node_list = await v1.list_node(label_selector=label_selector)
@@ -82,7 +90,7 @@ class CloudProvider(ABC):
         """
         Get object status of a Kubernetes custom resource.
         """
-        await config.load_kube_config()
+        await self.load_kubernetes_config()
         async with ApiClient() as api:
             v1 = client.CustomObjectsApi(api)
             try:
