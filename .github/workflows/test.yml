@@ -64,10 +64,6 @@ jobs:
         kubectl cluster-info
         kubectl get nodes
 
-    - name: Install CRDs
-      run: |
-        kubectl apply -f helm/k8s_node_operator/crds/
-
     - name: Test suite
       run: hatch run +py=${{ matrix.python-version }} test:run
 
