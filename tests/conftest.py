@@ -1,4 +1,5 @@
 import logging
+import kopf
 import pytest
 import subprocess
 from pathlib import Path
@@ -40,5 +41,5 @@ def create_kind_cluster():
 # Note: kopfRunner instantiates provider within the handler, but we provider another instance as a fixture for test assertions
 @pytest.fixture(scope='session', autouse=True)
 def provider():
-    provider = create_provider(name="TEST", logger=logger)
+    provider = create_provider(name="TEST", npat_name="test-npat", spec=kopf.Spec, logger=logger)
     yield provider

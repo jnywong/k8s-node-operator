@@ -4,12 +4,13 @@ import google.api_core
 import kopf
 import logging
 import os
+from abc import ABC
 from dataclasses import dataclass
 from enum import Enum
 from google.cloud import container_v1
 from kubernetes.aio import client, config
 from kubernetes.aio.client.api_client import ApiClient
-from abc import ABC
+from types import TracebackType
 
 class NodepoolState(Enum):
     READY = 1
@@ -43,6 +44,15 @@ class CloudProvider(ABC):
             self.log = logger
         else:
             print('No kopf logger detected.')
+
+    async def __aenter__(self):
+        ...
+
+    async def __aexit__(self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,):
+        ...
 
     async def get_nodepool(self, target_min_node_count: int, nodepool: NodepoolType = None):
         ... # Note that `...` is a Python placeholder object
@@ -269,7 +279,7 @@ class TestProvider(CloudProvider):
     """
     No-op cloud provider for testing and mocking.
     """
-    def __init__(self, npat_name: str, logger: kopf.Logger):
+    def __init__(self, npat_name: str, logger: kopf.Logger | None = None):
         super().__init__(npat_name=npat_name, logger=logger)
         self._entered = False
         self._exited = False
@@ -304,7 +314,7 @@ class TestProvider(CloudProvider):
         return self.nodepool
 
 
-def create_provider(name: str,  npat_name: str | None = None, spec: kopf.Spec | None = None, logger: kopf.Logger | logging.Logger | None = None) -> CloudProvider:
+def create_provider(name: str,  npat_name: str, spec: kopf.Spec, logger: kopf.Logger | logging.Logger | None = None) -> CloudProvider:
     if name == "GCP":
         return GCPProvider(spec=spec, npat_name = npat_name, logger=logger)
     elif name == "TEST":
