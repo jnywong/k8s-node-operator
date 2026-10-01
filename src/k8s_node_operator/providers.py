@@ -4,7 +4,7 @@ import google.api_core
 import kopf
 import logging
 import os
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass
 from enum import Enum
 from google.cloud import container_v1
