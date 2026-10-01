@@ -3,7 +3,7 @@ from tempfile import NamedTemporaryFile
 import yaml
 
 
-def generate_test_npat_file(name, target_min_node_count):
+def generate_test_npat_file(name, target_min_node_count) -> str:
     """
     Create npat manifest for testing.
     """

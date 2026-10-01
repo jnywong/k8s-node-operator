@@ -6,6 +6,9 @@ from k8s_node_operator.providers import create_provider, NodepoolState
 @kopf.on.create('nodepoolallocationtarget')
 @kopf.on.update('nodepoolallocationtarget')
 async def nodepool_allocation(spec: kopf.Spec, name: str, logger: kopf.Logger, **_: Any) -> Dict:
+    """
+    Set minimum node count on create or update.
+    """
     # Determine cloud provider
     provider_name = os.environ.get("K8S_NODE_OPERATOR_CLOUD_PROVIDER", "")
     async with create_provider(name=provider_name, spec=spec, npat_name=name, logger=logger) as provider:
@@ -17,7 +20,9 @@ async def nodepool_allocation(spec: kopf.Spec, name: str, logger: kopf.Logger, *
 
 @kopf.on.delete('nodepoolallocationtarget')
 async def delete_nodepool_allocation(spec: kopf.Spec, name: str, logger: kopf.Logger, **_: Any) -> None:
-    # Set minimum node count to zero
+    """
+    Set minimum node count to zero on delete.
+    """
     target_min_node_count = 0
     provider_name = os.environ.get("K8S_NODE_OPERATOR_CLOUD_PROVIDER", "")
     async with create_provider(name=provider_name, spec=spec, npat_name=name, logger=logger) as provider:

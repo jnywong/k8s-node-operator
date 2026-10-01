@@ -13,6 +13,9 @@ from kubernetes.aio.client.api_client import ApiClient
 from types import TracebackType
 
 class NodepoolState(Enum):
+    """
+    An enumerated list of nodepool states.
+    """
     READY = 1
     UPDATING = 2
     ERROR = 3
@@ -20,6 +23,9 @@ class NodepoolState(Enum):
 
 @dataclass
 class Nodepool:
+    """
+    A dataclass to abstract the concept of a nodepool independently of cloud-specific vendors.
+    """
     state: str
     name: str
     min_node_count: int
@@ -27,7 +33,7 @@ class Nodepool:
     current_node_count: int
     target_min_node_count: int
 
-type NodepoolType = container_v1.NodePool | None
+type NodepoolType = container_v1.NodePool | None  # TODO: update this when adding other cloud provider types.
 
 class CloudProvider(ABC):
     """
@@ -46,31 +52,32 @@ class CloudProvider(ABC):
             print('No kopf logger detected.')
 
     async def __aenter__(self):
-        ...
+        ... # Note that `...` is a Python placeholder object
 
     async def __aexit__(self,
         exc_type: type[BaseException] | None,
         exc: BaseException | None,
-        tb: TracebackType | None,):
+        tb: TracebackType | None):
         ...
 
-    async def get_nodepool(self, target_min_node_count: int, nodepool: NodepoolType = None):
-        ... # Note that `...` is a Python placeholder object
-
-    async def set_min_node_count(self, min_node_count: int):
+    async def get_nodepool(self, target_min_node_count: int, nodepool: NodepoolType = None) -> Nodepool:
         ...
 
-    async def load_kubernetes_config(self):
+    async def set_min_node_count(self, min_node_count: int) -> None:
+        ...
+
+    async def load_kubernetes_config(self) -> None:
+        """
+        Tries to authenticate to Kubernetes API from within a pod at first for production environments, otherwise it loads your local Kubernetes config context from `~/.kube/config` for local development environments.
+        """
         try:
-            # Load config from production k8s environment
             config.load_incluster_config()
         except config.ConfigException:
-            # Load config from local k8s environment
             await config.load_kube_config()
 
-    async def get_k8s_current_node_count(self, label_selector: str):
+    async def get_k8s_current_node_count(self, label_selector: str) -> int:
         """
-        Get current node count with 'Ready' status of nodepool by label selectors with the Kubernetes API. We use this as the source of truth for the number of nodes available, rather than through cloud provider specific APIs.
+        Get current ready nodes by label selectors with the Kubernetes API. We use this as the source of truth for the number of nodes available, rather than through cloud provider specific APIs.
         """
         await self.load_kubernetes_config()
         async with ApiClient() as api:
@@ -86,9 +93,9 @@ class CloudProvider(ABC):
         )
         return node_count
 
-    async def get_k8s_object_status(self):
+    async def get_k8s_object_status(self) -> dict:
         """
-        Get object status of a Kubernetes custom resource.
+        Get an object's status of a Kubernetes custom resource.
         """
         await self.load_kubernetes_config()
         async with ApiClient() as api:
@@ -105,11 +112,11 @@ class CloudProvider(ABC):
                 self.log.warning(f"{e}")
                 raise
 
-    async def update_k8s_object_status(self, body: dict):
+    async def update_k8s_object_status(self, body: dict) -> None:
         """
-        Patch object status of a Kubernetes custom resource.
+        Patch an object status of a Kubernetes custom resource.
         """
-        await config.load_kube_config()
+        await self.load_kubernetes_config()
         async with ApiClient() as api:
             v1 = client.CustomObjectsApi(api)
             try:
@@ -124,6 +131,7 @@ class CloudProvider(ABC):
                 self.log.debug(f'{self.name} status patched.')
             except Exception as e:
                 self.log.warning(f"{e}")
+                raise
         
 class GCPProvider(CloudProvider):
     """
@@ -133,7 +141,7 @@ class GCPProvider(CloudProvider):
         super().__init__(logger=logger, npat_name = npat_name)
         self.project_name = spec.get("project") or os.environ.get("GCP_PROJECT_ID")
         self.cluster_name = spec.get("cluster") or os.environ.get("GCP_CLUSTER")
-        self.zone = spec.get("zone") or os.environ.get("GCP_ZONE") # TODO: add support for regional clusters
+        self.zone = spec.get("zone") or os.environ.get("GCP_ZONE")
         self.region = spec.get("region") or os.environ.get("GCP_REGION") # TODO: add support for regional clusters
         self.nodepool = spec.get("nodepool", "") or os.environ.get("GCP_NODEPOOL", "")
         self.nodepool_label = spec.get("nodepoolLabel", "") or os.environ.get("GCP_NODEPOOL_LABEL", "")
@@ -152,14 +160,20 @@ class GCPProvider(CloudProvider):
     async def __aexit__(self, exc_type, exc, tb):
         await self.client.transport.close()
 
-    async def _get_gcp_nodepool(self):
+    async def _get_gcp_nodepool(self) -> container_v1.NodePool:
+        """
+        Request a vendor-specific GCP nodepool.
+        """
         request = container_v1.GetNodePoolRequest(
            name=self.nodepool_name
         )
         response = await self.client.get_node_pool(request=request)
         return response
 
-    async def get_nodepool(self, target_min_node_count: int, gcp_nodepool: NodepoolType = None):
+    async def get_nodepool(self, target_min_node_count: int, gcp_nodepool: NodepoolType = None) -> Nodepool:
+        """
+        Get a non-vendor-specific nodepool.
+        """
         if not gcp_nodepool:
             gcp_nodepool = await self._get_gcp_nodepool()
         current_node_count = await self.get_k8s_current_node_count(self.nodepool_label)
@@ -167,7 +181,7 @@ class GCPProvider(CloudProvider):
         target_min_node_count=target_min_node_count)
         return nodepool
 
-    async def wait_gcp_operation(self, operation_name: str):
+    async def wait_gcp_operation(self, operation_name: str) -> container_v1.Operation:
         """
         Blocking call to wait until operation is completed.
         """
@@ -182,9 +196,12 @@ class GCPProvider(CloudProvider):
             else:
                 return response
 
-    async def set_min_node_count(self, target_min_node_count: int):
+    async def set_min_node_count(self, target_min_node_count: int) -> Nodepool:
+        """
+        Set the minimum node count of a GCP nodepool.
+        """
         # Update npat with current nodepool state
-        gcp_nodepool = await self._get_gcp_nodepool() # We deal with the GCP nodepool object here since we will pass that into the GCP request later
+        gcp_nodepool = await self._get_gcp_nodepool() # We deal with the GCP-specific nodepool object here since we will pass that into the GCP request later
         current_node_count = await self.get_k8s_current_node_count(label_selector=self.nodepool_label)
         await self.update_k8s_object_status(
             body={
@@ -299,7 +316,7 @@ class TestProvider(CloudProvider):
     async def __aexit__(self, exc_type, exc, tb):
         self._exited = True
 
-    async def get_nodepool(self, target_min_node_count: int, nodepool = None):
+    async def get_nodepool(self, target_min_node_count: int, nodepool = None) -> Nodepool:
         self.nodepool = Nodepool(
             name="test-pool",
             state=NodepoolState.READY.name,
@@ -310,7 +327,7 @@ class TestProvider(CloudProvider):
         )
         return self.nodepool
 
-    async def set_min_node_count(self, target_min_node_count: int):
+    async def set_min_node_count(self, target_min_node_count: int) -> Nodepool:
         self.nodepool = Nodepool(
             name="test-nodepool",
             state=NodepoolState.READY.name,

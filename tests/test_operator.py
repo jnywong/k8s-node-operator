@@ -1,15 +1,9 @@
-import os
 import pytest
 import subprocess
 import time
 from kopf.testing import KopfRunner
 from .conftest import SRC_DIR, logger
 from .utils import generate_test_npat_file
-
-# NOTE: This test suite relies on a kind cluster. If the cluster is not destroyed properly for some reason, then this raises a 'CalledProcessError' the next time you run the suite. Manually destroy the cluster with `kind delete cluster --name test-cluster` before running the test suite again.
-
-# Use no-op cloud provider in KopfRunner
-os.environ["K8S_NODE_OPERATOR_CLOUD_PROVIDER"] = "TEST"
 
 @pytest.mark.asyncio
 class TestOperator:
