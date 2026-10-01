@@ -1,9 +1,12 @@
+import os
 import pytest
 import subprocess
 import time
 from kopf.testing import KopfRunner
 from .conftest import SRC_DIR, logger
 from .utils import generate_test_npat_file
+
+os.environ["K8S_NODE_OPERATOR_CLOUD_PROVIDER"] = "TEST"
 
 @pytest.mark.asyncio
 class TestOperator:
