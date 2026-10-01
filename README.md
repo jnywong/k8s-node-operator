@@ -62,7 +62,7 @@ kopf run -A src/k8s_node_operator/operator.py
 
 The following example usage is based on scaling nodes in a GCP GKE cluster nodepool.
 
-1. [Generate a service account](https://docs.cloud.google.com/iam/docs/service-accounts-create) for the `kopf` operator with [Kubernetes Engine Cluster Admin](https://docs.cloud.google.com/iam/docs/roles-permissions/container#container.clusterAdmin) role.
+1. [Generate a service account](https://docs.cloud.google.com/iam/docs/service-accounts-create) for the `kopf` operator with the [Kubernetes Engine Cluster Admin](https://docs.cloud.google.com/iam/docs/roles-permissions/container#container.clusterAdmin) role permissions.
 
 1. Add a service account key and save the key, e.g. `sa_key.secret.json` file securely.
 
@@ -86,8 +86,10 @@ The following example usage is based on scaling nodes in a GCP GKE cluster nodep
        nodepoolLabel: <kubernetes-nodepool-label>
    ```
 
+   You can also set `spec` values, except the `minimumNodeCount`, as environment variables in your `.env` file.
+
 > [!note]
-> The `kubernetes-nodepool-label` could be `kubernetes.io/hostname=colima` for a local development environment running k3s in a Colima VM.
+> For example, the `kubernetes-nodepool-label` could be `kubernetes.io/hostname=colima` for a local development environment running k3s in a Colima VM.
 
 1. Run the `kopf` operator
 
@@ -95,7 +97,7 @@ The following example usage is based on scaling nodes in a GCP GKE cluster nodep
    kopf run -A src/k8s_node_operator/operator.py
    ```
 
-1. In another terminal window, scale the GCP nodepool by creating the `npat` object with
+1. In another terminal window, scale the GCP nodepool by creating an `npat` object with
 
    ```bash
    kubectl apply -f examples/npat.yaml
@@ -111,14 +113,16 @@ The following example usage is based on scaling nodes in a GCP GKE cluster nodep
 
 1. Check that the nodepool minimum node count has updated, e.g. with Google Cloud Console > Kubernetes Engine > Clusters.
 
-1. Delete the `npat` resource to set the minimum nodepool size to 0 again.
+1. Patch the `npat` resource to update the minimum node count value with `kubectl edit` or `kubectl patch`
+
+1. Delete the `npat` resource to set the minimum nodepool size back down to 0 again.
 
    ```bash
    kubectl delete npat example-npat
    ```
 
 > [!note]
-> Sometimes the [deletion gets 'stuck'](https://docs.kopf.dev/en/stable/troubleshooting/#kubectl-freezes-on-object-deletion) when the finaliser cannot run to completion, e.g. when the `kopf` operator is down. You can force the deletion with
+> Sometimes the [deletion gets 'stuck'](https://docs.kopf.dev/en/stable/troubleshooting/#kubectl-freezes-on-object-deletion) when the object's finaliser cannot run to completion, e.g. the `npat` object is deleted when the `kopf` operator is down. You can re-run the `kopf` operator to clean up, or force the deletion with
 >
 > ```bash
 > kubectl patch npat example-npat -p '{"metadata": {"finalizers": []}}' --type merge
