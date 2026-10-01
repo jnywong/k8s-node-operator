@@ -107,7 +107,6 @@ class CloudProvider(ABC):
                     plural=self.plural,
                     name=self.name
                 )
-                self.log.debug(f"{obj=}")
                 return obj["status"]
             except Exception as e:
                 self.log.warning(f"{e}")
