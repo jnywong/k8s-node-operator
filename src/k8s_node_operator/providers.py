@@ -4,7 +4,7 @@ import google.api_core
 import kopf
 import logging
 import os
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from google.cloud import container_v1
@@ -60,10 +60,10 @@ class CloudProvider(ABC):
         tb: TracebackType | None):
         ...
 
-    async def get_nodepool(self, target_min_node_count: int, nodepool: NodepoolType = None) -> Nodepool:
+    async def get_nodepool(self, target_min_node_count: int, nodepool: NodepoolType = None):
         ...
 
-    async def set_min_node_count(self, min_node_count: int) -> None:
+    async def set_min_node_count(self, min_node_count: int):
         ...
 
     async def load_kubernetes_config(self) -> None:
