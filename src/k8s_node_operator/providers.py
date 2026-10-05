@@ -260,7 +260,7 @@ class GCPProvider(CloudProvider):
         else:
             self.log.warning(f'Minimum node count is already set to {target_min_node_count}.')  # TODO: again, can we notify end-user here? Emit event?
         nodepool = await self.get_nodepool(gcp_nodepool=gcp_nodepool, target_min_node_count=target_min_node_count)
-        # Poll until k8s node count is greater than or equal to target minimum node count. TODO: interrupt if npat spec is updated?
+        # Poll until k8s node count is greater than or equal to target minimum node count. TODO: move all this to operator.py using https://docs.kopf.dev/en/stable/reconciliation/#level-based-triggering
         start = asyncio.get_running_loop().time()
         while asyncio.get_running_loop().time() - start < self.timeout:
             if nodepool.current_node_count >= target_min_node_count:
