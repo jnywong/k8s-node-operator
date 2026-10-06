@@ -111,7 +111,12 @@ The following example usage is based on scaling nodes in a GCP GKE cluster nodep
    example-npat   default-pool   UPDATING   1            1                       0                0                10s
    ```
 
-1. Check that the nodepool minimum node count has updated, e.g. with Google Cloud Console > Kubernetes Engine > Clusters.
+1. Check that the nodepool minimum node count has updated, e.g. with Google Cloud Console > Kubernetes Engine > Clusters, or running
+
+   ```bash
+   gcloud container node-pools describe $GCP_NODEPOOL --cluster $GCP_CLUSTER \
+    --location=$GCP_ZONE
+   ```
 
 1. Patch the `npat` resource to update the minimum node count value with `kubectl edit` or `kubectl patch`
 
