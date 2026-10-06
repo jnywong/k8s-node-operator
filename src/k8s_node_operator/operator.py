@@ -45,17 +45,17 @@ def k8s_nodes(body: kopf.Body, labels: kopf.Labels, name: str, logger: kopf.Logg
             if c['status'] == 'True':
                 return {label: value for label, value in labels.items()}
 
-@kopf.timer('nodepoolallocationtarget', interval=60)
-def count_k8s_nodes(spec: kopf.Spec, name: str, k8s_nodes: kopf.Index, patch: kopf.Patch, logger: kopf.Logger, **_: Any) -> None:
+@kopf.timer('nodepoolallocationtarget', interval=60) # type: ignore[arg-type]
+def count_k8s_nodes(spec: kopf.Spec, name: str, k8s_nodes: kopf.Index, patch: kopf.Patch, logger: kopf.Logger, **kwargs: Any) -> None:
     """
     Regularly calculate and save the *actual state* from an in-memory index of the k8s nodes. TODO: additional kopf.timers can be added to calculate actual state of interest of plugins, e.g. memory utilization.
     """
     label_name = spec.get('nodepoolLabelName', '')
     label_value = spec.get('nodepoolLabelValue', '')
-    ready_nodes = k8s_nodes.get(label_name, [])
+    ready_nodes: Any = k8s_nodes.get(label_name, [])
     current_node_count = len([label_value for n in ready_nodes if label_value == n])
     patch.status['current_node_count'] = current_node_count
 
-@kopf.on.event('nodepoolallocationtarget')
-def react_on_state_changes(body: kopf.Body, name: str, **_: Any) -> None:
-    ... # This is where reconciliation between target condition of plugin trigger and actual state will happen for level-based triggering https://docs.kopf.dev/en/stable/reconciliation/#level-based-triggering.
+# @kopf.on.event('nodepoolallocationtarget')
+# def react_on_state_changes(body: kopf.Body, name: str, **_: Any) -> None:
+#     ... # This is where reconciliation between target condition of plugin trigger and actual state will happen for level-based triggering https://docs.kopf.dev/en/stable/reconciliation/#level-based-triggering.

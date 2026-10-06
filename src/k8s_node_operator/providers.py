@@ -59,7 +59,7 @@ class CloudProvider(ABC):
         tb: TracebackType | None):
         ...
 
-    async def get_nodepool(self, target_min_node_count: int, nodepool: NodepoolType = None):
+    async def get_nodepool(self, state: str, target_min_node_count: int):
         ...
 
     async def set_min_node_count(self, min_node_count: int):
@@ -153,7 +153,7 @@ class GCPProvider(CloudProvider):
         response = await self.client.get_node_pool(request=request)
         return response
 
-    async def get_nodepool(self, state: str, target_min_node_count: int, gcp_nodepool: NodepoolType = None) -> Nodepool:
+    async def get_nodepool(self, state: str, target_min_node_count: int, gcp_nodepool: NodepoolType = None):
         """
         Get a non-vendor-specific nodepool.
         """
@@ -245,7 +245,7 @@ class TestProvider(CloudProvider):
     async def __aexit__(self, exc_type, exc, tb):
         self._exited = True
 
-    async def get_nodepool(self, target_min_node_count: int, nodepool = None) -> Nodepool:
+    async def get_nodepool(self, state: str, target_min_node_count: int, nodepool = None) -> Nodepool:
         self.nodepool = Nodepool(
             name="test-pool",
             state=NodepoolState.READY.name,
