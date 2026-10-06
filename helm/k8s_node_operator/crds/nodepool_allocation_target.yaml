@@ -30,19 +30,19 @@ spec:
       - name: Nodepool
         type: string
         description: Nodepool name
-        jsonPath: .status.nodepool_allocation.name
+        jsonPath: .spec.nodepoolLabelValue
       - name: State
         type: string
         description: Nodepool allocation target state
-        jsonPath: .status.nodepool_allocation.state
+        jsonPath: .status.state
       - name: Node count
         type: integer
         description: Current node count
-        jsonPath: .status.nodepool_allocation.current_node_count
+        jsonPath: .status.current_node_count
       - name: Target Min node count
         type: integer
         description: Target minimum node count
-        jsonPath: .status.nodepool_allocation.target_min_node_count
+        jsonPath: .spec.minimumNodeCount
       - name: Min node count
         type: integer
         description: Minimum node count

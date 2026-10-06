@@ -30,14 +30,13 @@ class Nodepool:
     name: str
     min_node_count: int
     max_node_count: int
-    current_node_count: int
     target_min_node_count: int
 
 type NodepoolType = container_v1.NodePool | None  # TODO: update this when adding other cloud provider types.
 
 class CloudProvider(ABC):
     """
-    Abstract base class that standardizes the construction of all cloud providers (see https://peps.python.org/pep-3119/).
+    Abstract base class with Kubernetes API methods and standardizes the construction of all cloud providers (see https://peps.python.org/pep-3119/).
     """
     def __init__(self, logger: kopf.Logger | logging.Logger | None = None, npat_name: str | None = None, timeout: int = 300, interval: int = 10):
         self.group = 'jupyter.org'
@@ -75,23 +74,6 @@ class CloudProvider(ABC):
         except config.ConfigException:
             await config.load_kube_config()
 
-    async def get_k8s_current_node_count(self, label_selector: str) -> int:
-        """
-        Get current ready nodes by label selectors with the Kubernetes API. We use this as the source of truth for the number of nodes available, rather than through cloud provider specific APIs.
-        """
-        await self.load_kubernetes_config()
-        async with ApiClient() as api:
-            v1 = client.CoreV1Api(api)
-            node_list = await v1.list_node(label_selector=label_selector)
-        node_count = sum(
-            1
-            for node in node_list.items
-            if any(
-                condition.type == "Ready" and condition.status == "True"
-                for condition in node.status.conditions
-            )
-        )
-        return node_count
 
     async def get_k8s_object_status(self) -> dict:
         """
@@ -143,8 +125,9 @@ class GCPProvider(CloudProvider):
         self.cluster_name = spec.get("cluster") or os.environ.get("GCP_CLUSTER")
         self.zone = spec.get("zone") or os.environ.get("GCP_ZONE")
         self.region = spec.get("region") or os.environ.get("GCP_REGION") # TODO: add support for regional clusters
-        self.nodepool = spec.get("nodepool", "") or os.environ.get("GCP_NODEPOOL", "")
-        self.nodepool_label = spec.get("nodepoolLabel", "") or os.environ.get("GCP_NODEPOOL_LABEL", "")
+        self.nodepool = spec.get("nodepoolName", "") or os.environ.get("GCP_NODEPOOL", "")
+        self.nodepool_label_name = spec.get("nodepoolLabelName", "") or os.environ.get("GCP_NODEPOOL_NAME", "")
+        self.nodepool_label_value = spec.get("nodepoolLabelValue", "") or os.environ.get("GCP_NODEPOOL_LABEL", "")  # NOTE: repetition -- can nodepool label != self.nodepool name?
         self.prefix =  f"projects/{self.project_name}/zones/{self.zone}" if self.zone else f"projects/{self.project_name}/region/{self.region}"
         self.nodepool_name = self.prefix + f"/clusters/{self.cluster_name}/nodePools/{self.nodepool}"
         self.credentials_file = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
@@ -170,14 +153,13 @@ class GCPProvider(CloudProvider):
         response = await self.client.get_node_pool(request=request)
         return response
 
-    async def get_nodepool(self, target_min_node_count: int, gcp_nodepool: NodepoolType = None) -> Nodepool:
+    async def get_nodepool(self, state: str, target_min_node_count: int, gcp_nodepool: NodepoolType = None) -> Nodepool:
         """
         Get a non-vendor-specific nodepool.
         """
         if not gcp_nodepool:
             gcp_nodepool = await self._get_gcp_nodepool()
-        current_node_count = await self.get_k8s_current_node_count(self.nodepool_label)
-        nodepool = Nodepool(state=NodepoolState.UPDATING.name, name=self.nodepool, min_node_count=gcp_nodepool.autoscaling.min_node_count, max_node_count=gcp_nodepool.autoscaling.max_node_count, current_node_count=current_node_count,
+        nodepool = Nodepool(state=state, name=self.nodepool, min_node_count=gcp_nodepool.autoscaling.min_node_count, max_node_count=gcp_nodepool.autoscaling.max_node_count,
         target_min_node_count=target_min_node_count)
         return nodepool
 
@@ -202,24 +184,9 @@ class GCPProvider(CloudProvider):
         """
         # Update npat with current nodepool state
         gcp_nodepool = await self._get_gcp_nodepool() # We deal with the GCP-specific nodepool object here since we will pass that into the GCP request later
-        current_node_count = await self.get_k8s_current_node_count(label_selector=self.nodepool_label)
-        await self.update_k8s_object_status(
-            body={
-                "status": {
-                    "nodepool_allocation": {
-                        "state": NodepoolState.UPDATING.name,
-                        "name": self.nodepool,
-                        "min_node_count": gcp_nodepool.autoscaling.min_node_count,
-                        "max_node_count": gcp_nodepool.autoscaling.max_node_count,
-                        "current_node_count": current_node_count,
-                        "target_min_node_count": target_min_node_count
-                    }
-                }
-            }
-        )
         # Decide whether to scale
         if target_min_node_count >= gcp_nodepool.autoscaling.max_node_count:
-            self.log.warning(f'Target minimum node count {target_min_node_count} exceeds maximum node count.')  # TODO: is there a way to notify end-user of incompatible spec?
+            self.log.info(f'Target minimum node count {target_min_node_count} exceeds maximum node count.')  # TODO: is there a way to notify end-user of incompatible spec?
         elif target_min_node_count != gcp_nodepool.autoscaling.min_node_count:
             gcp_nodepool_autoscaling = container_v1.NodePoolAutoscaling(
                 enabled = gcp_nodepool.autoscaling.enabled,
@@ -233,17 +200,17 @@ class GCPProvider(CloudProvider):
             )
             try:
                 operation = await self.client.set_node_pool_autoscaling(request=request)
+                self.log.debug(f'{operation.name=}')
             except google.api_core.exceptions.FailedPrecondition as e:
                 # This can happen e.g. if nodepool state is already busy running another operation.
                 await self.update_k8s_object_status(
                     body={
                         "status": {
+                            "state": NodepoolState.ERROR.name,
                             "nodepool_allocation": {
-                                "state": NodepoolState.ERROR.name,
                                 "name": self.nodepool,
                                 "min_node_count": gcp_nodepool.autoscaling.min_node_count,
                                 "max_node_count": gcp_nodepool.autoscaling.max_node_count,
-                                "current_node_count": current_node_count,
                                 "target_min_node_count": target_min_node_count
                             }
                         }
@@ -258,47 +225,9 @@ class GCPProvider(CloudProvider):
             gcp_nodepool = await self._get_gcp_nodepool()
             self.log.info(f'Minimum node count successfully set to {gcp_nodepool.autoscaling.min_node_count}.')
         else:
-            self.log.warning(f'Minimum node count is already set to {target_min_node_count}.')  # TODO: again, can we notify end-user here? Emit event?
-        nodepool = await self.get_nodepool(gcp_nodepool=gcp_nodepool, target_min_node_count=target_min_node_count)
-        # Poll until k8s node count is greater than or equal to target minimum node count. TODO: move all this to operator.py using https://docs.kopf.dev/en/stable/reconciliation/#level-based-triggering
-        start = asyncio.get_running_loop().time()
-        while asyncio.get_running_loop().time() - start < self.timeout:
-            if nodepool.current_node_count >= target_min_node_count:
-                return nodepool
-            else:
-                self.log.warning(f'Kubernetes node count {nodepool.current_node_count} is less than target minimum node count {target_min_node_count}. Waiting for {self.interval} seconds before polling Kubernetes API again.')
-                nodepool = await self.get_nodepool(gcp_nodepool=gcp_nodepool, target_min_node_count=target_min_node_count)
-                await self.update_k8s_object_status(
-                    body={
-                        "status": {
-                            "nodepool_allocation": {
-                                "state": NodepoolState.UPDATING.name,
-                                "name": self.nodepool,
-                                "min_node_count": nodepool.min_node_count,
-                                "max_node_count": nodepool.max_node_count,
-                                "current_node_count": nodepool.current_node_count,
-                                "target_min_node_count": target_min_node_count
-                            }
-                        }
-                    }
-                )
-                await asyncio.sleep(self.interval)
-        # Update npat status and fatally raise handler error after exceeding timeout
-        await self.update_k8s_object_status(
-            body={
-                "status": {
-                    "nodepool_allocation": {
-                        "state": NodepoolState.ERROR.name,
-                        "name": self.nodepool,
-                        "min_node_count": nodepool.min_node_count,
-                        "max_node_count": nodepool.max_node_count,
-                        "current_node_count": nodepool.current_node_count,
-                        "target_min_node_count": target_min_node_count
-                    }
-                }
-            }
-        )
-        raise kopf.PermanentError(f"Timed out after {self.timeout} seconds waiting for at least {target_min_node_count} nodes in nodepool with label '{self.nodepool_label}'. Current node count = {nodepool.current_node_count}.")
+            self.log.info(f'Minimum node count is already set to {target_min_node_count}.')  # TODO: again, can we notify end-user here? Emit event?
+        nodepool = await self.get_nodepool(state = NodepoolState.READY.name, gcp_nodepool=gcp_nodepool, target_min_node_count=target_min_node_count)
+        return nodepool
 
 class TestProvider(CloudProvider):
     """
@@ -322,7 +251,6 @@ class TestProvider(CloudProvider):
             state=NodepoolState.READY.name,
             min_node_count=0, 
             max_node_count=0,
-            current_node_count=0,
             target_min_node_count=target_min_node_count, # target_min_node_count is the only variable we are testing
         )
         return self.nodepool
@@ -333,7 +261,6 @@ class TestProvider(CloudProvider):
             state=NodepoolState.READY.name,
             min_node_count=0,
             max_node_count=0,
-            current_node_count=0,
             target_min_node_count=target_min_node_count, # target_min_node_count is the only variable we are testing
         )
         return self.nodepool
@@ -346,7 +273,3 @@ def create_provider(name: str,  npat_name: str, spec: kopf.Spec, logger: kopf.Lo
         return TestProvider(npat_name = npat_name, logger=logger)
     else:
         raise ValueError(f"Provider name '{name}' not recognized.")
-
-# TODO:
-# - add npat labels to select upon
-# - emit k8s events

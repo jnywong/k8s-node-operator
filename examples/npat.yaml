@@ -3,5 +3,6 @@ kind: NodepoolAllocationTarget
 metadata:
   name: example-npat
 spec:
-  minimumNodeCount: 0
-  
+  minimumNodeCount: 1
+  nodepoolLabelName: cloud.google.com/gke-nodepool
+  nodepoolLabelValue: test-pool
