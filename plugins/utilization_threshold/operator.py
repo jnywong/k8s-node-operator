@@ -54,16 +54,12 @@ def calculate_k8s_nodepool_utilization(spec: kopf.Spec, name: str, k8s_nodes_all
     label_name = spec.get('nodepoolLabelName', '')
     label_value = spec.get('nodepoolLabelValue', '')
     resource = spec.get('policy').get('type')
-    # Utilization = requests / allocatable. Use Counter() to divide values over dictionary keys
-    requests = Counter(get_nodepool_resource_requests(k8s_nodes_requests, resource, logger))
-    allocatable = Counter(get_nodepool_allocatable_resource(k8s_nodes_allocatable, label_name, label_value, resource))
-    logger.debug(f'{requests=}')
-    logger.debug(f'{allocatable=}')
-    utilization_nodes = Counter({key: requests[key] / allocatable[key] for key in allocatable})
-    logger.debug(f'{utilization_nodes=}')
-    utilization_nodepool = sum([v for _, v in utilization_nodes.items()])
-    logger.debug(f'{utilization_nodepool=}')
-    patch.status['utilization'] = round(utilization_nodepool, digits)
+    # utilization = sum(requests) / sum(allocatable)
+    requests = get_nodepool_resource_requests(k8s_nodes_requests, resource, logger)
+    allocatable = get_nodepool_allocatable_resource(k8s_nodes_allocatable, label_name, label_value, resource)
+    utilization = sum([v for _, v in requests.items()]) / sum([v for _, v in allocatable.items()])
+    logger.debug(f'{utilization=}')
+    patch.status['utilization'] = round(utilization, digits)
 
 def get_nodepool_allocatable_resource(nodes: kopf.Index, label_name: str, label_value: str, resource: str) -> dict(str, float):
     """
