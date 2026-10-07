@@ -44,7 +44,7 @@ def k8s_nodes_requests(body: kopf.Body, labels: kopf.Labels, name: str, logger: 
     requests = []
     containers = body['spec']['containers']
     for container in containers:
-        requests.append(container['resources']['requests'])
+        requests.append(container.get('resources').get('requests'))
     node_name = body['spec']['nodeName']
     return {node_name: requests}
 
@@ -79,7 +79,8 @@ def get_nodepool_resource_requests(nodes: kopf.Index, resource: str, logger: kop
         pods = []
         for value in values:
             for v in value:
-                pods.append(v.get(resource, '0'))
+                if v is not None:
+                    pods.append(v.get(resource, '0'))
         node_requests = float(sum([quantity.parse_quantity(pod) for pod in pods]))
         requests.update({node_name: node_requests})
     return requests
