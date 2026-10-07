@@ -1,7 +1,7 @@
 import kopf
 import os
 from typing import Any, Dict
-from k8s_node_operator.providers import create_provider
+from k8s_autoscaler_plugins.providers import create_provider
 
 # Nodepool allocation target (npat) custom resource
 

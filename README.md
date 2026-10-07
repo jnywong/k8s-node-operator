@@ -1,4 +1,4 @@
-# k8s-node-operator
+# k8s-autoscaler-plugins
 
 Scale nodes for your Kubernetes cluster ahead of time with flexible plugins.
 
@@ -29,7 +29,7 @@ pip install -e '.[dev]'
 Install the `NodepoolAllocationTarget` [custom resource definition](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/) (CRD) with
 
 ```bash
-kubectl apply -f helm/k8s_node_operator/crds/nodepool_allocation_target.yaml
+kubectl apply -f helm/k8s_autoscaler_plugins/crds/nodepool_allocation_target.yaml
 ```
 
 > [!note]
@@ -40,7 +40,7 @@ kubectl apply -f helm/k8s_node_operator/crds/nodepool_allocation_target.yaml
 Run the `kopf` operator with
 
 ```bash
-kopf run -A src/k8s_node_operator/operator.py
+kopf run -A src/k8s_autoscaler_plugins/operator.py
 ```
 
 > [!note]
@@ -94,7 +94,7 @@ The following example usage is based on scaling nodes in a GCP GKE cluster nodep
 1. Run the `kopf` operator
 
    ```bash
-   kopf run -A src/k8s_node_operator/operator.py
+   kopf run -A src/k8s_autoscaler_plugins/operator.py
    ```
 
 1. In another terminal window, scale the GCP nodepool by creating an `npat` object with
