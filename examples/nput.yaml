@@ -1,0 +1,10 @@
+apiVersion: jupyter.org/v1
+kind: NodepoolUtilizationThreshold
+metadata:
+  name: example-nput
+spec:
+  nodepoolLabelValue: test-pool
+  policy:
+    type: memoryRequests
+    minimumThreshold: 0.6
+    maximumThreshold: 0.8

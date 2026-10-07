@@ -6,19 +6,11 @@ import logging
 import os
 from abc import ABC
 from dataclasses import dataclass
-from enum import Enum
 from google.cloud import container_v1
 from kubernetes.aio import client, config
 from kubernetes.aio.client.api_client import ApiClient
 from types import TracebackType
-
-class NodepoolState(Enum):
-    """
-    An enumerated list of nodepool states.
-    """
-    READY = 1
-    UPDATING = 2
-    ERROR = 3
+from src.k8s_autoscaler_plugins.base import NodepoolState
 
 
 @dataclass
