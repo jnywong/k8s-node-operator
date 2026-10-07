@@ -17,7 +17,7 @@ You can contribute in many ways, for example:
 
 ### Report Bugs
 
-Report bugs at [https://github.com/2i2c-org/k8s-autoscaler-plugins/issues](https://github.com/2i2c-org/k8s-node-operator/issues).
+Report bugs at [https://github.com/2i2c-org/k8s-autoscaler-plugins/issues](https://github.com/2i2c-org/k8s-autoscaler-plugins/issues).
 
 **If you are reporting a bug, please follow the template guidelines. The more
 detailed your report, the easier and thus faster we can help you.**
@@ -48,7 +48,7 @@ part of the official documentation, in docstrings, an update to our Contributing
 
 ### Submit Feedback
 
-The best way to send feedback is to file an issue at [https://github.com/2i2c-org/k8s-autoscaler-plugins/issues](https://github.com/2i2c-org/k8s-node-operator/issues). If your feedback fits the format of one of the issue templates, please use that. Remember that this is a volunteer-driven project and everybody has limited time.
+The best way to send feedback is to file an issue at [https://github.com/2i2c-org/k8s-autoscaler-plugins/issues](https://github.com/2i2c-org/k8s-autoscaler-plugins/issues). If your feedback fits the format of one of the issue templates, please use that. Remember that this is a volunteer-driven project and everybody has limited time.
 
 ## Get Started!
 

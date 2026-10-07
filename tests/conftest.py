@@ -3,14 +3,14 @@ import kopf
 import pytest
 import subprocess
 from pathlib import Path
-from k8s_node_operator.providers import create_provider
+from k8s_autoscaler_plugins.providers import create_provider
 
 logger = logging.getLogger(__name__)
 
 
 PROJECT_DIR = Path(__file__).parent.parent
-SRC_DIR = PROJECT_DIR.joinpath('src/k8s_node_operator')
-CRD_FILE = PROJECT_DIR.joinpath('helm/k8s_node_operator/crds/nodepool_allocation_target.yaml')
+SRC_DIR = PROJECT_DIR.joinpath('src/k8s_autoscaler_plugins')
+CRD_FILE = PROJECT_DIR.joinpath('helm/k8s_autoscaler_plugins/crds/nodepool_allocation_target.yaml')
 
 @pytest.fixture(scope='session', autouse=True)
 def create_kind_cluster():

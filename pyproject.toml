@@ -11,7 +11,7 @@ requires = ["hatchling", "hatch-vcs"]
 ################################################################################
 
 [project]
-name = "k8s-node-operator"
+name = "k8s-autoscaler-plugins"
 
 dynamic = ["version"]
 
@@ -49,10 +49,10 @@ dependencies = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/2i2c-org/k8s-node-operator"
-"Source Code" = "https://github.com/2i2c-org/k8s-node-operator"
-"Bug Tracker" = "https://github.com/2i2c-org/k8s-node-operator/issues"
-"Documentation" = "https://k8s-node-operator.readthedocs.io/en/latest/"
+"Homepage" = "https://github.com/2i2c-org/k8s-autoscaler-plugins"
+"Source Code" = "https://github.com/2i2c-org/k8s-autoscaler-plugins"
+"Bug Tracker" = "https://github.com/2i2c-org/k8s-autoscaler-plugins/issues"
+"Documentation" = "https://k8s-autoscaler-plugins.readthedocs.io/en/latest/"
 
 # [project.scripts]
 # script = "<package>.__main__:<entrypoint>"
