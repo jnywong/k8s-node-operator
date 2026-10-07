@@ -1,16 +1,17 @@
-{{- /* Generated with https://patorjk.com/software/taag/#p=display&f=Soft&t=k8s+node%0Aoperator&x=none&v=4&h=4&w=70&we=true */}}                                           
+{{- /* Generated with https://patorjk.com/software/taag/#p=display&f=Small%20Slant&t=k8s%0Aautoscaler%0Aplugins&x=none&w=70*/}}                                           
                                                            
-,--.    ,---.                              ,--.            
-|  |,-.|  o  | ,---.     ,--,--,  ,---.  ,-|  | ,---.      
-|     /.'   '.(  .-'     |      \| .-. |' .-. || .-. :     
-|  \  \|  o  |.-'  `)    |  ||  |' '-' '\ `-' |\   --.     
-`--'`--'`---' `----'     `--''--' `---'  `---'  `----'     
-                                      ,--.                 
- ,---.  ,---.  ,---. ,--.--. ,--,--.,-'  '-. ,---. ,--.--. 
-| .-. || .-. || .-. :|  .--'' ,-.  |'-.  .-'| .-. ||  .--' 
-' '-' '| '-' '\   --.|  |   \ '-'  |  |  |  ' '-' '|  |    
- `---' |  |-'  `----'`--'    `--`--'  `--'   `---' `--'    
-       `--'                                                
+                                                                
+   __   ___                                
+  / /__( _ )___                            
+ /  '_/ _  (_-<                            
+/_/\_\\___/___/                   __       
+ ___ ___ __/ /____  ___ _______ _/ /__ ____
+/ _ `/ // / __/ _ \(_-</ __/ _ `/ / -_) __/
+\_,_/\_,_/\__/\___/___/\__/\_,_/_/\__/_/   
+   ___  / /_ _____ _(_)__  ___             
+  / _ \/ / // / _ `/ / _ \(_-<             
+ / .__/_/\_,_/\_, /_/_//_/___/             
+/_/          /___/                                     
 
 Thank you for installing {{ .Chart.Name }}!
 
@@ -19,7 +20,7 @@ Thank you for installing {{ .Chart.Name }}!
   - Kubernetes namespace: {{ .Release.Namespace }}
   - Helm release name:    {{ .Release.Name }}
   - Helm chart version:   {{ .Chart.Version }}
-  - GitHub repo:          https://github.com/2i2c-org/k8s-node-operator
+  - GitHub repo:          https://github.com/2i2c-org/k8s-autoscaler-plugins
 
 ### Post-installation checklist
 
