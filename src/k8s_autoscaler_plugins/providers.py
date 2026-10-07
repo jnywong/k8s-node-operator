@@ -1,4 +1,3 @@
-import asyncio
 import google.auth
 import google.api_core
 import kopf

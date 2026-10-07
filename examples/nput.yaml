@@ -3,8 +3,9 @@ kind: NodepoolUtilizationThreshold
 metadata:
   name: example-nput
 spec:
+  nodepoolLabelName: cloud.google.com/gke-nodepool
   nodepoolLabelValue: test-pool
   policy:
-    type: memoryRequests
+    type: memory
     minimumThreshold: 0.6
     maximumThreshold: 0.8
