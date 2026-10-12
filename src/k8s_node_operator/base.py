@@ -4,9 +4,12 @@ from enum import Enum
 from google.cloud import container_v1
 from kubernetes.aio import client, config
 from kubernetes.aio.client.api_client import ApiClient
-from k8s_node_operator.providers import CloudProvider
 
 type NodepoolType = container_v1.NodePool | None  # TODO: update this when adding other cloud provider types.
+
+NODEPOOL_LABELS = {
+    'GCP': 'cloud.google.com/gke-nodepool'
+}
 
 class NodepoolState(Enum):
     """
@@ -21,19 +24,14 @@ class Nodepool:
     """
     Abstract the concept of a nodepool independently of cloud-specific vendors.
     """
-    def __init__(self, name: str, zone: str, region: str):
-        self.state: NodepoolState
-        self.min_node_count: int
-        self.max_node_count: int
-        self.target_min_node_count: int
+    def __init__(self, name: str, zone: str, region: str, min_node_count: int, max_node_count: int, target_min_node_count: int, state: str):
         self.name = name
         self.zone = zone
         self.region = region
-
-    async def set_min_node_count(self):
-        ...
-
-
+        self.min_node_count = min_node_count
+        self.max_node_count = max_node_count
+        self.target_min_node_count = target_min_node_count
+        self.state = state
 class KubernetesClient:
     async def __aenter__(self):
         await self.load_kubernetes_config()
@@ -66,18 +64,18 @@ class KubernetesClient:
             except Exception as e:
                 raise e
 
-def get_nodepool_list(node_list: list, region_label: str = 'topology.kubernetes.io/region', zone_label: str = 'topology.kubernetes.io/zone') -> list[Nodepool]:
-    NODEPOOL_LABELS = {
-        'GCP': 'cloud.google.com/gke-nodepool'
-    }
-    cloud_provider = os.environ.get('K8S_NODE_OPERATOR_CLOUD_PROVIDER', '')
-    nodepool_name_label = NODEPOOL_LABELS[cloud_provider]
+def get_nodepool_list(node_list: list, provider_name: str | None = None, region_label: str = 'topology.kubernetes.io/region', zone_label: str = 'topology.kubernetes.io/zone') -> list[dict]:
+
+    if not provider_name:
+        provider_name = os.environ.get('K8S_NODE_OPERATOR_CLOUD_PROVIDER', '')
+    nodepool_name_label = NODEPOOL_LABELS[provider_name]
     nodepool_list = []
     for node in node_list:
-        name = node.metadata.labels[nodepool_name_label]
-        zone = node.metadata.labels[zone_label]
-        region = node.metadata.labels[region_label]
-        nodepool = Nodepool(name=name, zone=zone, region=region)
-        nodepool_list.append(nodepool)
-    unique_nodepools = list({nodepool.name: nodepool for nodepool in nodepool_list}.values())
-    return unique_nodepools
+        item = {
+            'name': node.metadata.labels[nodepool_name_label],
+            'zone': node.metadata.labels[zone_label],
+            'region': node.metadata.labels[region_label]
+        }
+        if item not in nodepool_list:
+            nodepool_list.append(item)
+    return nodepool_list
