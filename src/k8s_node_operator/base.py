@@ -123,6 +123,7 @@ class Nodepool:
                 data = await provider.get_nodepool(name=nodepool.name, zone = nodepool.zone, region = nodepool.region)
                 nodepool.min_node_count = data['min_node_count']
                 nodepool.max_node_count = data['max_node_count']
+                nodepool.current_node_count = nodepool.get_current_node_count(node_list)
                 nodepool.state = NodepoolState.READY.name
         return unique_nodepool_list
 
@@ -132,6 +133,16 @@ class Nodepool:
         Construct Nodepool object from Node object.
         """
         return cls(name=node.nodepool_name, zone=node.zone, region=node.region, label_selector=node.label_selector)
+
+    def get_current_node_count(self, node_list: list[Node]) -> int:
+        """
+        Get current node count from node list.
+        """
+        node_count = 0
+        for node in node_list:
+            if node.nodepool_name == self.name:
+                node_count += 1
+        return node_count
 
     async def set_min_node_count(self, target_min_node_count: int):
         """
@@ -161,4 +172,3 @@ class KubernetesClient:
             config.load_incluster_config()
         except config.ConfigException:
             await config.load_kube_config()
-
