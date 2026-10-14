@@ -5,11 +5,83 @@ from google.cloud import container_v1
 from kubernetes.aio import client, config
 from kubernetes.aio.client.api_client import ApiClient
 
+
 type NodepoolType = container_v1.NodePool | None  # TODO: update this when adding other cloud provider types.
 
+PROVIDER_NAME = os.environ.get('K8S_NODE_OPERATOR_CLOUD_PROVIDER', '')
 NODEPOOL_LABELS = {
     'GCP': 'cloud.google.com/gke-nodepool'
 }
+
+class Node:
+    """
+    Abstract the concept of a node independently of cloud-specific vendors.
+    """
+    name_label = 'kubernetes.io/hostname'
+    region_label = 'topology.kubernetes.io/region'
+    zone_label = 'topology.kubernetes.io/zone'
+    nodepool_label = NODEPOOL_LABELS[PROVIDER_NAME]
+
+    def __init__(self, node_name: str, region: str, zone: str, label_selector: str, nodepool_name: str):
+        self.node_name = node_name
+        self.region = region
+        self.zone = zone
+        self.label_selector = label_selector
+        self.nodepool_name = nodepool_name
+
+    @classmethod
+    async def list_node(cls, label_selector: str = '', index: kopf.Index | None = None) -> list[Node]:
+        """
+        List nodes by label selector from in-memory kopf index if it exists, otherwise make a Kubernetes API call.
+        """
+        if index:
+            return cls.from_index(index=index, label_selector=label_selector)
+        else:
+            return await cls.from_k8s_api(label_selector=label_selector)
+
+    @classmethod
+    async def from_k8s_api(cls, label_selector: str = '') -> list[client.V1Node]:
+        """
+        Get a list of Node objects from Kubernetes API call.
+        """
+        async with KubernetesClient() as client:
+            try:
+                node_list = await client.api_core.list_node(label_selector=label_selector)
+            except Exception as e:
+                raise kopf.TemporaryError(f'{e}')
+        return [cls.from_k8s_node(node, label_selector) for node in node_list.items]
+
+    @classmethod
+    def from_k8s_node(cls, node: client.V1Node, label_selector:str = '') -> Node:
+        """
+        Construct a Node object from a client.V1Node element of the from_k8s_api() method.
+        """
+        return cls(node_name=node.metadata.labels[cls.name_label], region=node.metadata.labels[cls.region_label], zone=node.metadata.labels[cls.zone_label], label_selector=label_selector, nodepool_name=node.metadata.labels[cls.nodepool_label])
+
+    @classmethod
+    def from_index(cls, index: kopf.Index,  label_selector: str = '') -> list[Node]:
+        """
+        Construct a list of Node objects from the kopf in-memory index of Kubernetes nodes.
+        """
+        # Convert dict of list to list of dict
+        node_list = [dict(zip(index, v)) for v in zip(*index.values())] 
+        return [cls.from_dict(node, label_selector) for node in node_list]
+
+    @classmethod
+    def from_dict(cls, node: dict,  label_selector: str = '') -> Node:
+        """
+        Construct a Node object from a node_list element of the from_index() method.
+        """
+        if label_selector:
+            label_selector_split = label_selector.split('=')
+            label_selector_name = label_selector_split[0]
+            label_selector_value = label_selector_split[1]
+            if node[label_selector_name] == label_selector_value:
+                return cls(node_name=node[cls.name_label], region=node[cls.region_label], zone=node[cls.zone_label], label_selector=label_selector, nodepool_name=node[cls.nodepool_label])
+            else:
+                pass
+        else:
+            return cls(node_name=node[cls.name_label], region=node[cls.region_label], zone=node[cls.zone_label], label_selector=label_selector, nodepool_name=node[cls.nodepool_label])
 
 class NodepoolState(Enum):
     """
@@ -32,6 +104,21 @@ class Nodepool:
         self.max_node_count = max_node_count
         self.target_min_node_count = target_min_node_count
         self.state = state
+
+    @classmethod
+    async def list_nodepool(self, label_selector: str = '', node_list: list[Node] | None = None) -> list[Nodepool]:
+        """
+        List nodepools from node list if it exists, otherwise make a Kubernetes API call.
+        """
+        if node_list:
+            nodepool_list = [{'name': node.nodepool_name, 'zone': node.zone, 'region': node.region} for node in node_list]
+            # Get list of unique nodepool dicts
+            nodepool_list = list({v['name']:v for v in nodepool_list}.values())
+        else:
+            async with KubernetesClient() as client:
+                nodepool_list = await client.get_nodepool_list(label_selector=label_selector)
+        return nodepool_list
+
 class KubernetesClient:
     async def __aenter__(self):
         await self.load_kubernetes_config()
@@ -51,31 +138,3 @@ class KubernetesClient:
             config.load_incluster_config()
         except config.ConfigException:
             await config.load_kube_config()
-
-    async def list_nodes(self, label_selector: str = '', index_nodes: kopf.Index | None = None) -> list[client.V1Node]:
-        """
-        List k8s nodes using in-memory kopf.Index if it exists, otherwise makes k8s API call.
-        """
-
-        if not index_nodes:
-            try:
-                node_list = await self.api_core.list_node()
-                return node_list.items
-            except Exception as e:
-                raise e
-
-def get_nodepool_list(node_list: list, provider_name: str | None = None, region_label: str = 'topology.kubernetes.io/region', zone_label: str = 'topology.kubernetes.io/zone') -> list[dict]:
-
-    if not provider_name:
-        provider_name = os.environ.get('K8S_NODE_OPERATOR_CLOUD_PROVIDER', '')
-    nodepool_name_label = NODEPOOL_LABELS[provider_name]
-    nodepool_list = []
-    for node in node_list:
-        item = {
-            'name': node.metadata.labels[nodepool_name_label],
-            'zone': node.metadata.labels[zone_label],
-            'region': node.metadata.labels[region_label]
-        }
-        if item not in nodepool_list:
-            nodepool_list.append(item)
-    return nodepool_list
