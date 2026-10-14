@@ -30,15 +30,15 @@ spec:
       - name: Nodepool
         type: string
         description: Nodepool name
-        jsonPath: .spec.nodepoolLabelValue
+        jsonPath: .status.nodepool_allocation.name[*]
       - name: State
         type: string
         description: Nodepool allocation target state
-        jsonPath: .status.state
+        jsonPath: .status.nodepool_allocation.status
       - name: Node count
         type: integer
         description: Current node count
-        jsonPath: .status.current_node_count
+        jsonPath: .status.nodepool_allocation.current_node_count[*]
       - name: Target Min node count
         type: integer
         description: Target minimum node count
@@ -46,11 +46,11 @@ spec:
       - name: Min node count
         type: integer
         description: Minimum node count
-        jsonPath: .status.nodepool_allocation.min_node_count
+        jsonPath: .status.nodepool_allocation.min_node_count[*]
       - name: Max node count
         type: integer
         description: Maximum node count
-        jsonPath: .status.nodepool_allocation.max_node_count
+        jsonPath: .status.nodepool_allocation.max_node_count[*]
       - name: Age
         type: date
         jsonPath: .metadata.creationTimestamp
