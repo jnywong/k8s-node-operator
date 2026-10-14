@@ -117,7 +117,7 @@ class Nodepool:
         }
 
     @classmethod
-    async def list_nodepool(cls, node_list: list[Node], label_selector: str = '') -> list[Nodepool]:
+    async def list_nodepool(cls, node_list: list[Node], target_min_node_count: int, label_selector: str = '') -> list[Nodepool]:
         """
         List nodepools from a node list.
         """
@@ -136,6 +136,7 @@ class Nodepool:
                 data = await provider.get_nodepool(name=nodepool.name, zone = nodepool.zone, region = nodepool.region)
                 nodepool.min_node_count = data['min_node_count']
                 nodepool.max_node_count = data['max_node_count']
+                nodepool.target_min_node_count = target_min_node_count
                 nodepool.current_node_count = nodepool.get_current_node_count(node_list)
                 nodepool.state = NodepoolState.READY.name
                 nodepool.status = nodepool.get_status(nodepool)
@@ -158,11 +159,12 @@ class Nodepool:
                 node_count += 1
         return node_count
 
-    async def set_min_node_count(self, target_min_node_count: int):
+    async def set_min_node_count(self, target_min_node_count: int | None = None):
         """
         Set nodepool minimum node count with cloud provider.
         """
-        self.target_min_node_count = target_min_node_count
+        if target_min_node_count:
+            self.target_min_node_count = target_min_node_count
         self.state = NodepoolState.UPDATING.name
         async with create_provider(PROVIDER_NAME) as provider:
             await provider.set_min_node_count(self)
