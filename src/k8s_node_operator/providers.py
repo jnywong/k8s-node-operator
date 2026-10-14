@@ -11,11 +11,11 @@ class CloudProvider(ABC):
     """
     Abstract base class with Kubernetes API methods and standardizes the construction of all cloud providers (see https://peps.python.org/pep-3119/).
     """
-    def __init__(self, logger: kopf.Logger | logging.Logger | None = None, timeout: int = 300, interval: int = 10):
+    def __init__(self, logger: kopf.Logger | None = None, timeout: int = 300, interval: int = 10):
         if logger:
             self.log = logger
         else:
-            print('No kopf logger detected.')
+            self.log = logging.getLogger(__name__)
 
     async def __aenter__(self):
         ... # Note that `...` is a Python placeholder object
@@ -38,7 +38,6 @@ class GCPProvider(CloudProvider):
     """
     def __init__(self, logger: kopf.Logger | None = None):
         super().__init__(logger=logger)
-        self.log = logger
         self.project_name = os.environ.get('GCP_PROJECT_ID', '')
         self.cluster_name = os.environ.get('GCP_CLUSTER', '')
         self.credentials_file = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
@@ -159,7 +158,7 @@ class TestProvider(CloudProvider):
         ...
 
 
-def create_provider(name: str, logger: kopf.Logger | logging.Logger | None = None) -> CloudProvider:
+def create_provider(name: str, logger: kopf.Logger | None = None) -> CloudProvider:
     if name == "GCP":
         return GCPProvider(logger = logger)
     elif name == "TEST":
