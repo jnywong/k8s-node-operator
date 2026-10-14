@@ -1,41 +1,50 @@
 import kopf
 import os
 from typing import Any, Dict
-from k8s_node_operator.providers import create_provider
+from k8s_node_operator.base import Node, Nodepool, NodepoolState
 
 # Nodepool allocation target (npat) custom resource
 
+PROVIDER_NAME = os.environ.get('K8S_NODE_OPERATOR_CLOUD_PROVIDER', '')
+
 @kopf.on.create('nodepoolallocationtarget')
 @kopf.on.update('nodepoolallocationtarget')
-async def nodepool_allocation(spec: kopf.Spec, patch: kopf.Patch, name: str, logger: kopf.Logger, **_: Any) -> Dict:
+async def nodepool_allocation(spec: kopf.Spec, k8s_nodes: kopf.Index, memo: kopf.Memo, patch: kopf.Patch, name: str, logger: kopf.Logger, **_: Any) -> Dict:
     """
-    Set minimum node count on create or update.
+    Set minimum node count of selected nodepools. 
     """
+    # Parse spec
+    label_selector = spec.get('nodeSelector')
     target_min_node_count = spec.get('minimumNodeCount')
-    # Determine cloud provider
-    provider_name = os.environ.get("K8S_NODE_OPERATOR_CLOUD_PROVIDER", "")
-    async with create_provider(name=provider_name, spec=spec, npat_name=name, logger=logger) as provider:
-        # Set minimum node count
-        nodepool = await provider.set_min_node_count(target_min_node_count=target_min_node_count)
-        # Store result in k8s npat object
-        patch.status['state'] = nodepool.state
-        return {'name': nodepool.name, 'min_node_count': nodepool.min_node_count, 'max_node_count': nodepool.max_node_count, 'target_min_node_count': nodepool.target_min_node_count}
+    if not target_min_node_count: # Spec 'minimumNodeCount: 0' returns None, so set this to integer value 0 explicitly if needed
+        target_min_node_count = 0 
+    # List nodepools that match the node label selector
+    node_list = await Node.list_node(label_selector=label_selector, index=k8s_nodes)
+    nodepool_list = await Nodepool.list_nodepool(node_list, target_min_node_count)
+    # Set nodepool minimum node count
+    for nodepool in nodepool_list:
+        await nodepool.set_min_node_count(target_min_node_count)
+    status = Nodepool.get_status_list(nodepool_list)
+    return status
 
 @kopf.on.delete('nodepoolallocationtarget')
-async def delete_nodepool_allocation(spec: kopf.Spec, patch: kopf.Patch, name: str, logger: kopf.Logger, **_: Any) -> None:
+async def delete_nodepool_allocation(spec: kopf.Spec, patch: kopf.Patch, k8s_nodes: kopf.Index, logger: kopf.Logger, **_: Any) -> None:
     """
     Set minimum node count to zero on delete.
     """
+    label_selector = spec.get('nodeSelector')
     target_min_node_count = 0
-    provider_name = os.environ.get("K8S_NODE_OPERATOR_CLOUD_PROVIDER", "")
-    async with create_provider(name=provider_name, spec=spec, npat_name=name, logger=logger) as provider:
-        nodepool = await provider.set_min_node_count(target_min_node_count=target_min_node_count)
-        logger.info(f'npat deleted: "{nodepool.name}" minimum node count set to {nodepool.min_node_count}.')
+    # List k8s nodepools with node label selector
+    node_list = await Node.list_node(label_selector=label_selector, index = k8s_nodes)
+    nodepool_list = await Nodepool.list_nodepool(node_list, target_min_node_count)
+    # Set nodepool minimum node count
+    for nodepool in nodepool_list:
+        await nodepool.set_min_node_count(target_min_node_count)
+        logger.info(f'npat deleted: "{nodepool.name}" minimum node count set to {nodepool.target_min_node_count}.')
 
-# Reconciliation loop
 
 @kopf.index('nodes')
-def k8s_nodes(body: kopf.Body, labels: kopf.Labels, name: str, logger: kopf.Logger, **_: Any) -> Any:
+def k8s_nodes(body: kopf.Body, labels: kopf.Labels, logger: kopf.Logger, **_: Any) -> dict:
     """
     Keep in-memory index of ready k8s nodes to avoid multiple k8s API calls.
     """
@@ -46,16 +55,22 @@ def k8s_nodes(body: kopf.Body, labels: kopf.Labels, name: str, logger: kopf.Logg
                 return {label: value for label, value in labels.items()}
 
 @kopf.timer('nodepoolallocationtarget', interval=60) # type: ignore[arg-type]
-def count_k8s_nodes(spec: kopf.Spec, name: str, k8s_nodes: kopf.Index, patch: kopf.Patch, logger: kopf.Logger, **kwargs: Any) -> None:
+async def reconcile_k8s_nodes(spec: kopf.Spec, status: kopf.Status, name: str, k8s_nodes: kopf.Index, patch: kopf.Patch, logger: kopf.Logger, **kwargs: Any) -> None:
     """
-    Regularly calculate and save the *actual state* from an in-memory index of the k8s nodes. TODO: additional kopf.timers can be added to calculate actual state of interest of plugins, e.g. memory utilization.
+    Regularly reconcile node count current state with target state.
     """
-    label_name = spec.get('nodepoolLabelName', '')
-    label_value = spec.get('nodepoolLabelValue', '')
-    ready_nodes: Any = k8s_nodes.get(label_name, [])
-    current_node_count = len([label_value for n in ready_nodes if label_value == n])
-    patch.status['current_node_count'] = current_node_count
-
-# @kopf.on.event('nodepoolallocationtarget')
-# def react_on_state_changes(body: kopf.Body, name: str, **_: Any) -> None:
-#     ... # This is where reconciliation between target condition of plugin trigger and actual state will happen for level-based triggering https://docs.kopf.dev/en/stable/reconciliation/#level-based-triggering.
+    min_node_count = spec.get('minimumNodeCount')
+    label_selector = spec.get('nodeSelector')
+    node_list = await Node.list_node(label_selector=label_selector, index=k8s_nodes)
+    nodepool_list = await Nodepool.list_nodepool(node_list, min_node_count)
+    for nodepool in nodepool_list:
+        nodepool.current_node_count = nodepool.get_current_node_count(node_list)
+        if nodepool.target_min_node_count:
+            if nodepool.current_node_count >= nodepool.target_min_node_count:
+                logger.info('Target state reached')
+                nodepool.state = NodepoolState.READY.name
+            else:
+                logger.debug('Target state not reached')
+                nodepool.state = NodepoolState.UPDATING.name
+    status = Nodepool.get_status_list(nodepool_list)
+    patch.status['nodepool_allocation'] = status
