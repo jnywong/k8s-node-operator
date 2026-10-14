@@ -4,6 +4,7 @@ from enum import Enum
 from google.cloud import container_v1
 from kubernetes.aio import client, config
 from kubernetes.aio.client.api_client import ApiClient
+from k8s_node_operator.providers import create_provider
 
 
 type NodepoolType = container_v1.NodePool | None  # TODO: update this when adding other cloud provider types.
@@ -96,28 +97,50 @@ class Nodepool:
     """
     Abstract the concept of a nodepool independently of cloud-specific vendors.
     """
-    def __init__(self, name: str, zone: str, region: str, min_node_count: int, max_node_count: int, target_min_node_count: int, state: str):
+    def __init__(self, name: str, zone: str, region: str, label_selector: str):
         self.name = name
         self.zone = zone
         self.region = region
-        self.min_node_count = min_node_count
-        self.max_node_count = max_node_count
-        self.target_min_node_count = target_min_node_count
-        self.state = state
+        self.label_selector = label_selector
 
     @classmethod
-    async def list_nodepool(self, label_selector: str = '', node_list: list[Node] | None = None) -> list[Nodepool]:
+    async def list_nodepool(cls, node_list: list[Node], label_selector: str = '') -> list[Nodepool]:
         """
-        List nodepools from node list if it exists, otherwise make a Kubernetes API call.
+        List nodepools from a node list.
         """
-        if node_list:
-            nodepool_list = [{'name': node.nodepool_name, 'zone': node.zone, 'region': node.region} for node in node_list]
-            # Get list of unique nodepool dicts
-            nodepool_list = list({v['name']:v for v in nodepool_list}.values())
-        else:
-            async with KubernetesClient() as client:
-                nodepool_list = await client.get_nodepool_list(label_selector=label_selector)
-        return nodepool_list
+        nodepool_list = [Nodepool.from_node(node) for node in node_list]
+        # Get list of unique nodepools
+        unique_nodepool_names = list(set([nodepool.name for nodepool in nodepool_list]))
+        unique_nodepool_list = []
+        for u in unique_nodepool_names:
+            for nodepool in nodepool_list:
+                if u == nodepool.name:
+                    unique_nodepool_list.append(nodepool)
+                    break
+        # Get nodepool config from cloud provider
+        async with create_provider(PROVIDER_NAME) as provider:
+            for nodepool in unique_nodepool_list:
+                data = await provider.get_nodepool(name=nodepool.name, zone = nodepool.zone, region = nodepool.region)
+                nodepool.min_node_count = data['min_node_count']
+                nodepool.max_node_count = data['max_node_count']
+                nodepool.state = NodepoolState.READY.name
+        return unique_nodepool_list
+
+    @classmethod
+    def from_node(cls, node: Node) -> Nodepool:
+        """
+        Construct Nodepool object from Node object.
+        """
+        return cls(name=node.nodepool_name, zone=node.zone, region=node.region, label_selector=node.label_selector)
+
+    async def set_min_node_count(self, target_min_node_count: int):
+        """
+        Set nodepool minimum node count with cloud provider.
+        """
+        self.target_min_node_count = target_min_node_count
+        self.state = NodepoolState.UPDATING.name
+        async with create_provider(PROVIDER_NAME) as provider:
+            await provider.set_min_node_count(self)
 
 class KubernetesClient:
     async def __aenter__(self):
@@ -138,3 +161,4 @@ class KubernetesClient:
             config.load_incluster_config()
         except config.ConfigException:
             await config.load_kube_config()
+
