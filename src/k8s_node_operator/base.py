@@ -106,10 +106,8 @@ class Nodepool:
         self.max_node_count = None
         self.target_min_node_count = None
         self.current_node_count = None
-        self.state = None
         self.status = {
             'name': self.name, 
-            'state': self.state, 
             'min_node_count': self.min_node_count,
             'max_node_count': self.max_node_count,
             'target_min_node_count': self.target_min_node_count,
@@ -138,7 +136,6 @@ class Nodepool:
                 nodepool.max_node_count = data['max_node_count']
                 nodepool.target_min_node_count = target_min_node_count
                 nodepool.current_node_count = nodepool.get_current_node_count(node_list)
-                nodepool.state = NodepoolState.READY.name
                 nodepool.status = nodepool.get_status(nodepool)
         return unique_nodepool_list
 
@@ -165,7 +162,6 @@ class Nodepool:
         """
         if target_min_node_count:
             self.target_min_node_count = target_min_node_count
-        self.state = NodepoolState.UPDATING.name
         async with create_provider(PROVIDER_NAME) as provider:
             await provider.set_min_node_count(self)
 
@@ -175,7 +171,6 @@ class Nodepool:
         """
         self.status = {
             'name': self.name, 
-            'state': self.state, 
             'min_node_count': self.min_node_count,
             'max_node_count': self.max_node_count,
             'target_min_node_count': self.target_min_node_count,
@@ -184,18 +179,10 @@ class Nodepool:
         return self.status
     
     @staticmethod
-    def get_status_list(nodepool_list: list[Nodepool]) -> dict:
+    def get_status_list(nodepool_list: list[Nodepool], state: str) -> dict:
         """
         Get overall state of nodepool list, with a list of values for each status key.
         """
-        # Get overall state
-        state = [nodepool.status['state'] for nodepool in nodepool_list]
-        if NodepoolState.ERROR.name in state:
-            state = NodepoolState.ERROR.name
-        elif NodepoolState.UPDATING.name in state:
-            state = NodepoolState.UPDATING.name
-        else:
-            state = NodepoolState.READY.name
         # Get list for each status key
         status = dict.fromkeys(iter(nodepool_list[0].status), [])
         for k, v in status.items():
