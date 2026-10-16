@@ -122,6 +122,12 @@ class GCPProvider(CloudProvider):
             except google.api_core.exceptions.FailedPrecondition as e:
                 # This can happen e.g. if nodepool state is already busy running another operation. Kopf will retry the handler again on TemporaryError
                 raise kopf.TemporaryError(f"{e}")
+            # Block until current scaling operation is completed
+            if operation:
+                await self.wait_gcp_operation(operation_name = operation.name, zone = nodepool.zone, region = nodepool.region)
+            self.log.info(f'Minimum node count {gcp_nodepool.autoscaling.min_node_count} request sent to cloud provider.')
+        else:
+            self.log.info(f'Minimum node count is already set to {target_min_node_count}.')                
 
 class TestProvider(CloudProvider):
     """
