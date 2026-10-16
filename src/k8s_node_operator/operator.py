@@ -15,9 +15,9 @@ async def nodepool_allocation(spec: kopf.Spec, k8s_nodes: kopf.Index, memo: kopf
     """
     # Parse spec
     label_selector = spec.get('nodeSelector')
-    target_min_node_count = spec.get('minimumNodeCount')
-    if not target_min_node_count: # Spec 'minimumNodeCount: 0' returns None, so set this to integer value 0 explicitly if needed
-        target_min_node_count = 0 
+    target_min_node_count = spec.get('minimumNodeCount', 0)
+    # if not target_min_node_count: # Spec 'minimumNodeCount: 0' returns None, so set this to integer value 0 explicitly if needed
+        # target_min_node_count = 0 
     # List nodepools that match the node label selector
     node_list = await Node.list_node(label_selector=label_selector, index=k8s_nodes)
     nodepool_list = await Nodepool.list_nodepool(node_list, target_min_node_count)
@@ -27,17 +27,17 @@ async def nodepool_allocation(spec: kopf.Spec, k8s_nodes: kopf.Index, memo: kopf
 @kopf.on.delete('nodepoolallocationtarget')
 async def delete_nodepool_allocation(spec: kopf.Spec, patch: kopf.Patch, k8s_nodes: kopf.Index, logger: kopf.Logger, **_: Any) -> None:
     """
-    Set minimum node count to zero on delete.
+    Set minimum node count to 0 on delete.
     """
     label_selector = spec.get('nodeSelector')
     target_min_node_count = 0
     # List k8s nodepools with node label selector
     node_list = await Node.list_node(label_selector=label_selector, index = k8s_nodes)
     nodepool_list = await Nodepool.list_nodepool(node_list, target_min_node_count)
-    # Set nodepool minimum node count
     for nodepool in nodepool_list:
-        await nodepool.set_min_node_count(target_min_node_count)
-        logger.info(f'npat deleted: "{nodepool.name}" minimum node count set to {nodepool.target_min_node_count}.')
+        if nodepool.min_node_count != nodepool.target_min_node_count:
+            logger.debug(f'[{nodepool.name}] Cloud provider minimum node count target state of {nodepool.min_node_count} not reached')
+            await nodepool.set_min_node_count(target_min_node_count)
 
 
 @kopf.index('nodes')
@@ -52,11 +52,30 @@ def k8s_nodes(body: kopf.Body, labels: kopf.Labels, logger: kopf.Logger, **_: An
                 return {label: value for label, value in labels.items()}
 
 @kopf.timer('nodepoolallocationtarget', interval=60) # type: ignore[arg-type]
-async def reconcile_nodepool(spec: kopf.Spec, status: kopf.Status, name: str, k8s_nodes: kopf.Index, patch: kopf.Patch, logger: kopf.Logger, **kwargs: Any) -> None:
+async def reconcile_provider(spec: kopf.Spec, status: kopf.Status, name: str, k8s_nodes: kopf.Index, patch: kopf.Patch, logger: kopf.Logger, **kwargs: Any) -> None:
     """
-    Regularly reconcile current state with target state. This is composed of two parts:
-        1. Reconcile target minimum node count with cloud provider
-        2. Reconcile target minimum node count with Kubernetes.
+    Regularly reconcile target minimum node count is equal to cloud provider config.
+    """
+    target_min_node_count = spec.get('minimumNodeCount', 0)
+    label_selector = spec.get('nodeSelector')
+    node_list = await Node.list_node(label_selector=label_selector, index=k8s_nodes)
+    nodepool_list = await Nodepool.list_nodepool(node_list, target_min_node_count)
+    for nodepool in nodepool_list: # TODO: add timeout error
+        if nodepool.min_node_count == nodepool.target_min_node_count:
+            logger.info(f'[{nodepool.name}] Cloud provider minimum node count target state of {nodepool.min_node_count} reached')
+            state = NodepoolState.READY.name
+        else:
+            logger.debug(f'[{nodepool.name}] Cloud provider minimum node count target state of {nodepool.min_node_count} not reached')
+            # TODO: check operation status from last time
+            await nodepool.set_min_node_count(target_min_node_count)
+            state = NodepoolState.UPDATING.name
+    status = Nodepool.get_status_list(nodepool_list, state)
+    patch.status['nodepool_allocation'] = status
+
+@kopf.timer('nodepoolallocationtarget', interval=60) # type: ignore[arg-type]
+async def reconcile_kubernetes(spec: kopf.Spec, status: kopf.Status, name: str, k8s_nodes: kopf.Index, patch: kopf.Patch, logger: kopf.Logger, **kwargs: Any) -> None:
+    """
+    Regularly reconcile target minimum node count is less than or equal to current Kubernetes node count.
     """
     target_min_node_count = spec.get('minimumNodeCount')
     label_selector = spec.get('nodeSelector')
@@ -64,11 +83,11 @@ async def reconcile_nodepool(spec: kopf.Spec, status: kopf.Status, name: str, k8
     nodepool_list = await Nodepool.list_nodepool(node_list, target_min_node_count)
     for nodepool in nodepool_list:
         if nodepool.target_min_node_count:
-            if nodepool.min_node_count == nodepool.target_min_node_count:
-                logger.info('Target state reached')
+            if nodepool.target_min_node_count <= nodepool.current_node_count:
+                logger.info(f'[{nodepool.name}] Target minimum node count ({nodepool.target_min_node_count}) <= Kubernetes nodes online ({nodepool.current_node_count}) reached')
                 status = Nodepool.get_status_list(nodepool_list, NodepoolState.READY.name)
             else:
-                logger.debug('Target state not reached')
+                logger.debug(f'[{nodepool.name}] Target minimum node count ({nodepool.target_min_node_count}) <= Kubernetes nodes online ({nodepool.current_node_count}) not reached')
                 await nodepool.set_min_node_count(target_min_node_count)
                 status = Nodepool.get_status_list(nodepool_list, NodepoolState.UPDATING.name)
     patch.status['nodepool_allocation'] = status
