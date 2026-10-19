@@ -126,8 +126,12 @@ class Nodepool:
                 nodepool_list_provider = await provider.list_nodepool(label_selector)
                 nodepool_list = [Nodepool.from_provider(nodepool) for nodepool in nodepool_list_provider]
         # Get list of unique nodepools
-        unique_nodepool_names = list(set([nodepool.name for nodepool in nodepool_list]))
-        unique_nodepool_list = [nodepool if nodepool.name in unique_nodepool_names else None for nodepool in nodepool_list]
+        unique_nodepool_names = set()
+        unique_nodepool_list = []
+        for nodepool in nodepool_list:
+            if nodepool.name not in unique_nodepool_names:
+                unique_nodepool_names.add(nodepool.name)
+                unique_nodepool_list.append(nodepool)
         # Get nodepool config from cloud provider
         async with create_provider(PROVIDER_NAME) as provider:
             for nodepool in unique_nodepool_list:
