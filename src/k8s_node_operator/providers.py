@@ -134,8 +134,8 @@ class GCPProvider(CloudProvider):
                 if {label_selector_name: label_selector_value} == label_dict:
                     nodepool_dict = {
                             'name': nodepool.name,
-                            'zone': zone if zone else '',
-                            'region': region if region else '',
+                            'zone': zone if zone else self.cluster_location,
+                            'region': region if region else self.cluster_location,
                             'label_selector': label_selector
                             }
             else:
