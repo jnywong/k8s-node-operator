@@ -210,6 +210,9 @@ class KubernetesClient:
         self.api_client = ApiClient()
         self.api_core = client.CoreV1Api(self.api_client)
         self.api_custom_objects = client.CustomObjectsApi(self.api_client)
+        self.group = 'jupyter.org'
+        self.version = 'v1'
+        self.plural = 'nodepoolallocationtargets'
         return self
 
     async def __aexit__(self,  exc_type, exc, tb):
@@ -223,3 +226,18 @@ class KubernetesClient:
             config.load_incluster_config()
         except config.ConfigException:
             await config.load_kube_config()
+
+    async def get_custom_resource_object_status(self, name: str):
+        """
+        Get object status of a Kubernetes custom resource.
+        """
+        try:
+            obj = await self.api_custom_objects.get_cluster_custom_object(
+                group=self.group,
+                version=self.version,
+                plural=self.plural,
+                name=name
+            )
+            return obj["status"]
+        except Exception as e:
+            raise e
