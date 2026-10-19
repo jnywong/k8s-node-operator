@@ -120,25 +120,31 @@ class GCPProvider(CloudProvider):
         """
         Get vendor-specific nodepool list.
         """
-        request_parent = self._get_request_cluster(zone, region)
+        request_parent = self._list_request_nodepool(zone = zone, region = region)
         request = container_v1.ListNodePoolsRequest(parent=request_parent)
         response = await self.client.list_node_pools(request)
         nodepool_list = []
-        if label_selector:
-            label_selector_split = label_selector.split('=')
-            label_selector_name = label_selector_split[0]
-            label_selector_value = label_selector_split[1]
         for nodepool in list(response.node_pools):
-            label_dict = dict(nodepool.config.labels)
-            if {label_selector_name: label_selector_value} == label_dict:
-                nodepool_list.append(
-                    {
+            if label_selector:
+                label_selector_split = label_selector.split('=')
+                label_selector_name = label_selector_split[0]
+                label_selector_value = label_selector_split[1]
+                label_dict = dict(nodepool.config.labels)
+                if {label_selector_name: label_selector_value} == label_dict:
+                    nodepool_dict = {
+                            'name': nodepool.name,
+                            'zone': zone if zone else '',
+                            'region': region if region else '',
+                            'label_selector': label_selector
+                            }
+            else:
+                nodepool_dict = {
                         'name': nodepool.name,
-                        'zone': zone,
-                        'region': region,
-                        'label_selector': label_dict
-                    }
-                )
+                        'zone': zone if zone else '',
+                        'region': region if region else '',
+                        'label_selector': ''
+                        }
+            nodepool_list.append(nodepool_dict)
         return nodepool_list
 
     async def wait_gcp_operation(self, operation_name: str, zone: str | None = None, region: str | None = None) -> container_v1.Operation:
