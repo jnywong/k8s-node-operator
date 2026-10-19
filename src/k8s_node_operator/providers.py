@@ -157,7 +157,7 @@ class GCPProvider(CloudProvider):
         """
         Blocking call to wait until operation is completed.
         """
-        name = '/'.join([self._get_prefix_cluster(zone=zone, region=region), "operations", operation_name])
+        name = '/'.join([self._get_prefix_location(zone=zone, region=region), "operations", operation_name])
         request = container_v1.GetOperationRequest(name=name)
         while True:
             response = await self.client.get_operation(request=request)
