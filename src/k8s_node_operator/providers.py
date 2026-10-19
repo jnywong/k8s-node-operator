@@ -39,6 +39,7 @@ class GCPProvider(CloudProvider):
     def __init__(self, logger: kopf.Logger | None = None):
         super().__init__(logger=logger)
         self.project_name = os.environ.get('GCP_PROJECT_ID', '')
+        self.cluster_location = os.environ.get('GCP_LOCATION', '')
         self.cluster_name = os.environ.get('GCP_CLUSTER', '')
         self.credentials_file = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
         self.credentials, self.project = google.auth.default()
@@ -58,7 +59,7 @@ class GCPProvider(CloudProvider):
 
     def _get_prefix_location(self, location: bool = False, zone: str | None = None, region: str | None = None) -> str:
         if location:
-            return '/'.join([self._get_prefix_project(), f'locations/{zone}']) if zone else '/'.join([self._get_prefix_project(), f'locations/{region}']) 
+            return '/'.join([self._get_prefix_project(), f'locations/{self.cluster_location}'])
         else:
             return '/'.join([self._get_prefix_project(), f'zones/{zone}']) if zone else '/'.join([self._get_prefix_project(), f'region/{region}'])
 
@@ -68,12 +69,12 @@ class GCPProvider(CloudProvider):
         return request_name
 
     def _get_request_nodepool(self, name: str, zone: str | None = None, region: str | None = None):
-        prefix = self._get_prefix_cluster(zone, region)
+        prefix = self._get_prefix_cluster(zone=zone, region=region)
         request_name = '/'.join([prefix, f"nodePools/{name}"]) # TODO: use YARL
         return request_name
 
-    def _list_request_nodepool(self, zone: str | None = None, region: str | None = None):
-        request_name = self._get_prefix_cluster(True, zone, region)
+    def _list_request_nodepool(self, location: bool = True, zone: str | None = None, region: str | None = None):
+        request_name = self._get_prefix_cluster(location, zone, region)
         return request_name
 
     def _get_gcp_nodepool_limits(self, gcp_nodepool: container_v1.NodePool) -> dict:
@@ -118,7 +119,7 @@ class GCPProvider(CloudProvider):
     
     async def list_nodepool(self, label_selector: str = '', zone: str | None = None, region: str | None = None) -> list(dict):
         """
-        Get vendor-specific nodepool list.
+        Convert vendor-specific nodepool list to vendor-agnostic nodepool list.
         """
         request_parent = self._list_request_nodepool(zone = zone, region = region)
         request = container_v1.ListNodePoolsRequest(parent=request_parent)
@@ -138,10 +139,15 @@ class GCPProvider(CloudProvider):
                             'label_selector': label_selector
                             }
             else:
+                # Split location into region and zone
+                if self.cluster_location:
+                    cluster_location_split = self.cluster_location.split('-')
+                    region = ''.join(cluster_location_split[0:2])
+                    zone = self.cluster_location if len(cluster_location_split) == 3 else ''
                 nodepool_dict = {
                         'name': nodepool.name,
-                        'zone': zone if zone else '',
-                        'region': region if region else '',
+                        'zone': zone,
+                        'region': region,
                         'label_selector': ''
                         }
             nodepool_list.append(nodepool_dict)
@@ -151,7 +157,7 @@ class GCPProvider(CloudProvider):
         """
         Blocking call to wait until operation is completed.
         """
-        name = '/'.join([self._get_prefix(zone, region), "operations", operation_name])
+        name = '/'.join([self._get_prefix_cluster(zone=zone, region=region), "operations", operation_name])
         request = container_v1.GetOperationRequest(name=name)
         while True:
             response = await self.client.get_operation(request=request)

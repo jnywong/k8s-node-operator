@@ -119,15 +119,15 @@ class Nodepool:
         """
         List nodepools from a node list.
         """
-        nodepool_list = [Nodepool.from_node(node) for node in node_list]
+        if node_list:
+            nodepool_list = [Nodepool.from_node(node) for node in node_list]
+        else:
+            async with create_provider(PROVIDER_NAME) as provider:
+                nodepool_list_provider = await provider.list_nodepool(label_selector)
+                nodepool_list = [Nodepool.from_provider(nodepool) for nodepool in nodepool_list_provider]
         # Get list of unique nodepools
         unique_nodepool_names = list(set([nodepool.name for nodepool in nodepool_list]))
-        unique_nodepool_list = []
-        for u in unique_nodepool_names:
-            for nodepool in nodepool_list:
-                if u == nodepool.name:
-                    unique_nodepool_list.append(nodepool)
-                    break
+        unique_nodepool_list = [nodepool if nodepool.name in unique_nodepool_names else None for nodepool in nodepool_list]
         # Get nodepool config from cloud provider
         async with create_provider(PROVIDER_NAME) as provider:
             for nodepool in unique_nodepool_list:
@@ -145,6 +145,13 @@ class Nodepool:
         Construct Nodepool object from Node object.
         """
         return cls(name=node.nodepool_name, zone=node.zone, region=node.region, label_selector=node.label_selector)
+
+    @classmethod
+    def from_provider(cls, nodepool) -> Nodepool:
+        """
+        Construct Nodepool object from provider.list_nodepool() output.
+        """
+        return cls(name=nodepool['name'], zone=nodepool['zone'], region=nodepool['region'], label_selector=nodepool['label_selector'])
 
     def get_current_node_count(self, node_list: list[Node]) -> int:
         """
