@@ -63,7 +63,7 @@ class GCPProvider(CloudProvider):
 
     def _get_request_nodepool(self, name: str, zone: str | None = None, region: str | None = None):
         prefix = self._get_request_cluster(zone, region)
-        request_name = '/'.join([prefix, f"clusters/{self.cluster_name}/nodePools/{name}"]) # TODO: use YARL
+        request_name = '/'.join([prefix, f"nodePools/{name}"]) # TODO: use YARL
         return request_name
 
     def _get_gcp_nodepool_limits(self, gcp_nodepool: container_v1.NodePool) -> dict:
