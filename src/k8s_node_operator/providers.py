@@ -53,17 +53,27 @@ class GCPProvider(CloudProvider):
     async def __aexit__(self, exc_type, exc, tb):
         await self.client.transport.close()
 
-    def _get_prefix(self, zone: str | None = None, region: str | None = None):
-        return f"projects/{self.project_name}/zones/{zone}" if zone else f"projects/{self.project_name}/region/{region}"
+    def _get_prefix_project(self) -> str:
+        return f"projects/{self.project_name}"
 
-    def _get_request_cluster(self, zone: str | None = None, region: str | None = None):
-        prefix = self._get_prefix(zone, region)
+    def _get_prefix_location(self, location: bool = False, zone: str | None = None, region: str | None = None) -> str:
+        if location:
+            return '/'.join([self._get_prefix_project(), f'locations/{zone}']) if zone else '/'.join([self._get_prefix_project(), f'locations/{region}']) 
+        else:
+            return '/'.join([self._get_prefix_project(), f'zones/{zone}']) if zone else '/'.join([self._get_prefix_project(), f'region/{region}'])
+
+    def _get_prefix_cluster(self, location: bool = False, zone: str | None = None, region: str | None = None):
+        prefix = self._get_prefix_location(location, zone, region)
         request_name = '/'.join([prefix, f"clusters/{self.cluster_name}"]) # TODO: use YARL
         return request_name
 
     def _get_request_nodepool(self, name: str, zone: str | None = None, region: str | None = None):
-        prefix = self._get_request_cluster(zone, region)
+        prefix = self._get_prefix_cluster(zone, region)
         request_name = '/'.join([prefix, f"nodePools/{name}"]) # TODO: use YARL
+        return request_name
+
+    def _list_request_nodepool(self, zone: str | None = None, region: str | None = None):
+        request_name = self._get_prefix_cluster(True, zone, region)
         return request_name
 
     def _get_gcp_nodepool_limits(self, gcp_nodepool: container_v1.NodePool) -> dict:
