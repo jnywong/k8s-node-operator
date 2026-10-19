@@ -42,7 +42,7 @@ spec:
       - name: Target Min node count
         type: integer
         description: Target minimum node count
-        jsonPath: .spec.minimumNodeCount
+        jsonPath: .spec.plugins.alwaysOn.minimum
       - name: Min node count
         type: integer
         description: Minimum node count
