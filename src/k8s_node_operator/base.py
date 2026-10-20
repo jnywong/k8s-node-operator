@@ -62,8 +62,13 @@ class Node:
         Construct a list of Node objects from the kopf in-memory index of Kubernetes nodes.
         """
         # Convert dict of list to list of dict
-        node_list = [dict(zip(index, v)) for v in zip(*index.values())] 
-        return [cls.from_dict(node, label_selector) for node in node_list]
+        node_list_dict = [dict(zip(index, v)) for v in zip(*index.values())] 
+        node_list = []
+        for node in node_list_dict:
+            n = cls.from_dict(node, label_selector)
+            if n:
+                node_list.append(n)
+        return node_list
 
     @classmethod
     def from_dict(cls, node: dict,  label_selector: str = '') -> Node:
