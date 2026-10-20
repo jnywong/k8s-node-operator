@@ -1,11 +1,9 @@
 import kopf
-import os
 from typing import Any, Dict
 from k8s_node_operator.base import Node, Nodepool, NodepoolState
+from k8s_node_operator.const import PROVIDER_NAME, NODEPOOL_LABELS
 
 # Nodepool allocation target (npat) custom resource
-
-PROVIDER_NAME = os.environ.get('K8S_NODE_OPERATOR_CLOUD_PROVIDER', '')
 
 @kopf.on.create('nodepoolallocationtarget')
 @kopf.on.update('nodepoolallocationtarget')
@@ -64,7 +62,6 @@ async def reconcile_provider(spec: kopf.Spec, status: kopf.Status, name: str, k8
             state = NodepoolState.READY.name
         else:
             logger.debug(f'[{nodepool.name}] Cloud provider minimum node count target state of {nodepool.min_node_count} not reached')
-            # TODO: check operation status from last time
             await nodepool.set_min_node_count(target_min_node_count)
             state = NodepoolState.UPDATING.name
     status = Nodepool.get_status_list(nodepool_list, state)
