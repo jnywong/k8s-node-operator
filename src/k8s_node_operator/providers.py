@@ -219,14 +219,16 @@ class TestProvider(CloudProvider):
         self._exited = True
 
     async def get_nodepool(self, name: str, zone: str | None = None, region: str | None = None) -> dict:
-        return {
-            'name': 'test-pool',
+        data = {
+            'name': name,
             'min_node_count': 0,
-            'max_node_count': 1
-        } 
+            'max_node_count': 2
+        }
+        return data
 
     async def set_min_node_count(self, nodepool: Nodepool) -> None:
         ...
+        
 
 
 def create_provider(name: str, logger: kopf.Logger | None = None) -> CloudProvider:
