@@ -4,23 +4,26 @@ from k8s_node_operator.base import Node, Nodepool, KubernetesClient
 from .conftest import logger
 from .utils import generate_test_npat_file
 
+# TODO:
+# - request different k8s_nodes fixtures for different cloud providers in future
+
+@pytest.mark.asyncio
 class TestNode:
 
     label_selector = 'topology.kubernetes.io/zone=us-central1-b'
     zone = 'us-central1-b'
 
-    @pytest.mark.asyncio
     async def test_list_node(self, k8s_nodes):
         node_list = await Node.list_node(index=k8s_nodes)
         assert len(node_list) == 2
 
-    @pytest.mark.asyncio
     async def test_list_node_label_selector(self, k8s_nodes):
         node_list = await Node.list_node(index=k8s_nodes, label_selector=self.label_selector)
         assert len(node_list) == 1
         node = node_list[0]
         assert node.zone == self.zone
 
+@pytest.mark.asyncio
 class TestNodepool:
 
     label_selector = 'topology.kubernetes.io/zone=us-central1-b'
@@ -29,7 +32,6 @@ class TestNodepool:
     current_node_count = 1
     target_min_node_count = 1
 
-    @pytest.mark.asyncio
     async def test_list_nodepool(self, k8s_nodes):
         node_list = await Node.list_node(index=k8s_nodes)
         nodepool_list = await Nodepool.list_nodepool(node_list=node_list, target_min_node_count = self.target_min_node_count)
@@ -38,7 +40,6 @@ class TestNodepool:
         assert nodepool.current_node_count == self.current_node_count
         assert nodepool.target_min_node_count == self.target_min_node_count
 
-    @pytest.mark.asyncio
     async def test_list_nodepool_label_selector(self, k8s_nodes):
         node_list = await Node.list_node(index=k8s_nodes, label_selector=self.label_selector)
         nodepool_list = await Nodepool.list_nodepool(node_list=node_list, target_min_node_count = self.target_min_node_count)
@@ -50,12 +51,12 @@ class TestNodepool:
         assert nodepool.target_min_node_count == self.target_min_node_count
     
 
+@pytest.mark.asyncio
 class TestKubernetesClient:
 
     npat_name = 'test-npat'
     target_min_node_count = 1
 
-    @pytest.mark.asyncio
     async def test_get_custom_resource_object(self, kind_cluster):
         npat_file = generate_test_npat_file(name=self.npat_name, target_min_node_count=self.target_min_node_count)
         subprocess.run('kubectl apply -f' + npat_file, shell=True, check=True)
