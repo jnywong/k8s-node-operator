@@ -1,5 +1,6 @@
 import logging
-import kopf
+import json
+import os
 import pytest
 import subprocess
 from pathlib import Path
@@ -10,10 +11,13 @@ logger = logging.getLogger(__name__)
 
 PROJECT_DIR = Path(__file__).parent.parent
 SRC_DIR = PROJECT_DIR.joinpath('src/k8s_node_operator')
+TEST_DIR = PROJECT_DIR.joinpath('tests')
 CRD_FILE = PROJECT_DIR.joinpath('helm/k8s_node_operator/crds/nodepool_allocation_target.yaml')
+os.environ['K8S_NODE_OPERATOR_CLOUD_PROVIDER'] = 'TEST'
 
-@pytest.fixture(scope='session', autouse=True)
-def create_kind_cluster():
+
+@pytest.fixture(scope='class')
+def kind_cluster():
     """
     A [kind cluster](https://kind.sigs.k8s.io/) for running a local Kubernetes cluster.
     
@@ -42,12 +46,21 @@ def create_kind_cluster():
           check=True
         )
 
-@pytest.fixture(scope='session', autouse=True)
+@pytest.fixture(scope='session')
 def provider():
     """
     Use no-op cloud provider for testing.
     
     Note: kopfRunner instantiates a provider within the handler routine, but we provide another instance as a fixture so that we can access its attributes for test assertions.
     """
-    provider = create_provider(name="TEST", npat_name="test-npat", spec=kopf.Spec, logger=logger)
+    provider = create_provider(name="TEST", logger=logger)
     yield provider
+
+@pytest.fixture(scope='session')
+def k8s_nodes():
+    """
+    Fixture to mock in-memory index of Kubernetes nodes.
+    """
+    with open(f'{TEST_DIR}/fixtures/k8s_nodes_index.json', 'r') as f:
+        data = json.load(f)
+    yield data
