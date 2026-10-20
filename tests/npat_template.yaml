@@ -3,4 +3,6 @@ kind: NodepoolAllocationTarget
 metadata:
   name: "{name}"
 spec:
-  minimumNodeCount: "{minimumNodeCount}"
+  plugins:
+    alwaysOn:
+      minimum: "{minimum}"

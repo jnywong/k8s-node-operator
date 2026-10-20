@@ -1,19 +1,16 @@
-import os
 import pytest
 import subprocess
 import time
 from kopf.testing import KopfRunner
 from .conftest import SRC_DIR, logger
 from .utils import generate_test_npat_file
+from k8s_node_operator.base import KubernetesClient
 
-os.environ["K8S_NODE_OPERATOR_CLOUD_PROVIDER"] = "TEST"
 
 @pytest.mark.asyncio
 class TestOperator:
-    @pytest.fixture(autouse=True)
-    def setup(self, provider):
-        self.npat_name = 'test-npat'
-        provider.name = self.npat_name
+
+    npat_name = 'test-npat'
 
     @pytest.mark.parametrize("target_min_node_count", [0, 1])
     async def test_npat_create_and_delete(self, provider, target_min_node_count):
@@ -25,8 +22,9 @@ class TestOperator:
             # Create
             subprocess.run('kubectl apply -f' + npat_file, shell=True, check=True)
             time.sleep(1)
-            status = await provider.get_k8s_object_status()
-            assert int(status['nodepool_allocation']['target_min_node_count']) == target_min_node_count
+            async with KubernetesClient() as client:
+                status = await client.get_custom_resource_object(self.npat_name)
+            assert int(status['nodepool_allocation']['target_min_node_count'][0]) == target_min_node_count
             # Delete
             subprocess.run('kubectl delete -f ' + npat_file,
                 shell=True,
@@ -34,7 +32,8 @@ class TestOperator:
             )
             time.sleep(1)
             with pytest.raises(Exception):
-                status = await provider.get_k8s_object_status()
+                async with KubernetesClient() as client:
+                    status = await client.get_custom_resource_object(self.npat_name)
         assert runner.exit_code == 0
         assert runner.exception is None
         assert "NodepoolAllocationTarget" in runner.output
@@ -51,22 +50,28 @@ class TestOperator:
             # Create
             subprocess.run('kubectl apply -f' + npat_file, shell=True, check=True)
             time.sleep(1)
-            status = await provider.get_k8s_object_status()
-            assert int(status['nodepool_allocation']['target_min_node_count']) == create_target_min_node_count
+            async with KubernetesClient() as client:
+                status = await client.get_custom_resource_object(self.npat_name)
+            assert int(status['nodepool_allocation']['target_min_node_count'][0]) == create_target_min_node_count
             # Update
             update_target_min_node_count = 0
             subprocess.run('kubectl patch npat ' + self.npat_name + ' --type merge -p \'{\"spec\": {\"minimumNodeCount\": \"' + str(update_target_min_node_count) + '\"}}\'', shell=True, check=True)
             time.sleep(1)
-            status = await provider.get_k8s_object_status()
+            async with KubernetesClient() as client:
+                status = await client.get_custom_resource_object(self.npat_name)
             logger.warning(f'{status=}')
-            assert int(status['nodepool_allocation']['target_min_node_count']) == update_target_min_node_count
+            assert int(status['nodepool_allocation']['target_min_node_count'][0]) == update_target_min_node_count
             # Delete
             subprocess.run('kubectl delete -f' + npat_file, shell=True, check=True)
             time.sleep(1)
             with pytest.raises(Exception):
-                status = await provider.get_k8s_object_status()
+                async with KubernetesClient() as client:
+                    status = await client.get_custom_resource_object(self.npat_name)
 
         assert runner.exit_code == 0
         assert runner.exception is None
         assert "NodepoolAllocationTarget" in runner.output
         assert 'Deleted, really deleted' in runner.output
+
+# TODO
+# - use kopf.OperatorRegistry to isolate handlers for testing 
