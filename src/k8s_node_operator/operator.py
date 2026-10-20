@@ -7,7 +7,7 @@ from k8s_node_operator.const import PROVIDER_NAME, NODEPOOL_LABELS
 
 @kopf.on.create('nodepoolallocationtarget')
 @kopf.on.update('nodepoolallocationtarget')
-async def nodepool_allocation(spec: kopf.Spec, k8s_nodes: kopf.Index, memo: kopf.Memo, patch: kopf.Patch, name: str, logger: kopf.Logger, **_: Any) -> Dict:
+async def nodepool_allocation(spec: kopf.Spec, k8s_nodes: kopf.Index, logger: kopf.Logger, **_: Any) -> Dict:
     """
     Set minimum node count of selected nodepools. 
     """
@@ -21,7 +21,7 @@ async def nodepool_allocation(spec: kopf.Spec, k8s_nodes: kopf.Index, memo: kopf
     return status
 
 @kopf.on.delete('nodepoolallocationtarget')
-async def delete_nodepool_allocation(spec: kopf.Spec, patch: kopf.Patch, k8s_nodes: kopf.Index, logger: kopf.Logger, **_: Any) -> None:
+async def delete_nodepool_allocation(spec: kopf.Spec, k8s_nodes: kopf.Index, logger: kopf.Logger, **_: Any) -> None:
     """
     Set minimum node count to 0 on delete.
     """
