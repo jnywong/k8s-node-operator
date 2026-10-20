@@ -21,7 +21,7 @@ async def nodepool_allocation(spec: kopf.Spec, k8s_nodes: kopf.Index, logger: ko
     return status
 
 @kopf.on.delete('nodepoolallocationtarget')
-async def delete_nodepool_allocation(spec: kopf.Spec, k8s_nodes: kopf.Index, logger: kopf.Logger, **_: Any) -> None:
+async def delete_nodepool_allocation(spec: kopf.Spec, patch: kopf.Patch, k8s_nodes: kopf.Index, logger: kopf.Logger, **_: Any) -> Nodepool:
     """
     Set minimum node count to 0 on delete.
     """
@@ -33,7 +33,10 @@ async def delete_nodepool_allocation(spec: kopf.Spec, k8s_nodes: kopf.Index, log
     for nodepool in nodepool_list:
         if nodepool.min_node_count != nodepool.target_min_node_count:
             logger.debug(f'[{nodepool.name}] Cloud provider minimum node count target state of {nodepool.min_node_count} not reached')
-            await nodepool.set_min_node_count(target_min_node_count)
+            nodepool = await nodepool.set_min_node_count(target_min_node_count)
+        else:
+            logger.debug(f'[{nodepool.name}] Cloud provider minimum node count target state of {nodepool.min_node_count} reached')
+    return nodepool
 
 
 @kopf.index('nodes')
