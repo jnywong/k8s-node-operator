@@ -229,9 +229,9 @@ class KubernetesClient:
         except config.ConfigException:
             await config.load_kube_config()
 
-    async def get_custom_resource_object_status(self, name: str):
+    async def get_custom_resource_object(self, name: str):
         """
-        Get object status of a Kubernetes custom resource.
+        Get a Kubernetes custom resource object by name.
         """
         try:
             obj = await self.api_custom_objects.get_cluster_custom_object(
@@ -240,6 +240,6 @@ class KubernetesClient:
                 plural=self.plural,
                 name=name
             )
-            return obj["status"]
+            return obj
         except Exception as e:
             raise e
