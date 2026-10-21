@@ -1,4 +1,4 @@
-# k8s-node-operator
+# k8s-autoscaler-plugins
 
 Scale nodes for your Kubernetes cluster ahead of time with flexible plugins.
 

@@ -1,6 +1,6 @@
 import pytest
 import subprocess
-from k8s_node_operator.base import Node, Nodepool, KubernetesClient
+from k8s_autoscaler_plugins.base import Node, Nodepool, KubernetesClient
 from .utils import generate_test_npat_file
 
 # TODO:

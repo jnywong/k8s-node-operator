@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "k8s-node-operator.clusterrole.fullname" . }}
+  name: {{ include "k8s-autoscaler-plugins.clusterrole.fullname" . }}
 rules:
   # Ref: https://docs.kopf.dev/en/stable/deployment/
 
@@ -28,12 +28,12 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "k8s-node-operator.clusterrole.fullname" . }}
+  name: {{ include "k8s-autoscaler-plugins.clusterrole.fullname" . }}
 subjects:
   - kind: ServiceAccount
-    name: {{ include "k8s-node-operator.serviceaccount.fullname" . }}
+    name: {{ include "k8s-autoscaler-plugins.serviceaccount.fullname" . }}
     namespace: {{ .Release.Name }}
 roleRef:
   kind: ClusterRole
-  name: {{ include "k8s-node-operator.clusterrole.fullname" . }}
+  name: {{ include "k8s-autoscaler-plugins.clusterrole.fullname" . }}
   apiGroup: rbac.authorization.k8s.io

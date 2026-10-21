@@ -1,7 +1,7 @@
 import kopf
 import pytest
 from .conftest import logger
-from k8s_node_operator.operator import nodepool_allocation, delete_nodepool_allocation, k8s_nodes
+from k8s_autoscaler_plugins.operator import nodepool_allocation, delete_nodepool_allocation, k8s_nodes
 
 
 class TestOperator:

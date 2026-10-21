@@ -1,7 +1,7 @@
 import kopf
 from typing import Any, Dict
-from k8s_node_operator.base import Node, Nodepool, NodepoolState
-from k8s_node_operator.const import PROVIDER_NAME, NODEPOOL_LABELS
+from k8s_autoscaler_plugins.base import Node, Nodepool, NodepoolState
+from k8s_autoscaler_plugins.const import PROVIDER_NAME, NODEPOOL_LABELS
 
 # Nodepool allocation target (npat) custom resource
 

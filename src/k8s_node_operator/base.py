@@ -4,8 +4,8 @@ from enum import Enum
 from google.cloud import container_v1
 from kubernetes.aio import client, config
 from kubernetes.aio.client.api_client import ApiClient
-from k8s_node_operator.const import PROVIDER_NAME, NODEPOOL_LABELS
-from k8s_node_operator.providers import create_provider
+from k8s_autoscaler_plugins.const import PROVIDER_NAME, NODEPOOL_LABELS
+from k8s_autoscaler_plugins.providers import create_provider
 
 
 type NodepoolType = container_v1.NodePool | None  # TODO: update this when adding other cloud provider types.

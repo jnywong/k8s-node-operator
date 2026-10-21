@@ -11,7 +11,7 @@ requires = ["hatchling", "hatch-vcs"]
 ################################################################################
 
 [project]
-name = "k8s-node-operator"
+name = "k8s-autoscaler-plugins"
 
 dynamic = ["version"]
 
@@ -49,10 +49,10 @@ dependencies = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/2i2c-org/k8s-node-operator"
-"Source Code" = "https://github.com/2i2c-org/k8s-node-operator"
-"Bug Tracker" = "https://github.com/2i2c-org/k8s-node-operator/issues"
-"Documentation" = "https://k8s-node-operator.readthedocs.io/en/latest/"
+"Homepage" = "https://github.com/2i2c-org/k8s-autoscaler-plugins"
+"Source Code" = "https://github.com/2i2c-org/k8s-autoscaler-plugins"
+"Bug Tracker" = "https://github.com/2i2c-org/k8s-autoscaler-plugins/issues"
+"Documentation" = "https://k8s-autoscaler-plugins.readthedocs.io/en/latest/"
 
 # [project.scripts]
 # script = "<package>.__main__:<entrypoint>"
@@ -74,10 +74,10 @@ dev = [
 only-packages = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/k8s_node_operator"]
+packages = ["src/k8s_autoscaler_plugins"]
 
 [tool.hatch.build.hooks.vcs]
-version-file = "src/k8s_node_operator/_version.py"
+version-file = "src/k8s_autoscaler_plugins/_version.py"
 
 [tool.hatch.version]
 source = "vcs"
@@ -105,14 +105,14 @@ markers = ["raises"]
 
 [tool.coverage.paths]
 source = [
-    "src/k8s_node_operator",
+    "src/k8s_autoscaler_plugins",
 ]
 
 [tool.coverage.run]
 branch = true
 parallel = true
 omit = [
-    "src/k8s_node_operator/_version.py",
+    "src/k8s_autoscaler_plugins/_version.py",
 ]
 
 [tool.coverage.report]
@@ -180,7 +180,7 @@ dependencies = [
 python = ["3.12", "3.13", "3.14"]
 
 [tool.hatch.envs.test.scripts]
-run = "pytest {args:--cov=src/k8s_node_operator --cov-report=term-missing --cov-report=xml}"
+run = "pytest {args:--cov=src/k8s_autoscaler_plugins --cov-report=term-missing --cov-report=xml}"
 
 [tool.hatch.envs.style]
 description = """Check the style of the codebase."""
@@ -210,7 +210,7 @@ dependencies = [
 ]
 
 [tool.hatch.envs.types.scripts]
-check = "mypy --ignore-missing-imports src/k8s_node_operator"
+check = "mypy --ignore-missing-imports src/k8s_autoscaler_plugins"
 
 [tool.hatch.envs.docs]
 description = """Build or serve the documentation."""

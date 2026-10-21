@@ -4,15 +4,15 @@ import os
 import pytest
 import subprocess
 from pathlib import Path
-from k8s_node_operator.providers import create_provider
+from k8s_autoscaler_plugins.providers import create_provider
 
 logger = logging.getLogger(__name__)
 
 
 PROJECT_DIR = Path(__file__).parent.parent
-SRC_DIR = PROJECT_DIR.joinpath('src/k8s_node_operator')
+SRC_DIR = PROJECT_DIR.joinpath('src/k8s_autoscaler_plugins')
 TEST_DIR = PROJECT_DIR.joinpath('tests')
-CRD_FILE = PROJECT_DIR.joinpath('helm/k8s_node_operator/crds/nodepool_allocation_target.yaml')
+CRD_FILE = PROJECT_DIR.joinpath('helm/k8s_autoscaler_plugins/crds/nodepool_allocation_target.yaml')
 os.environ['K8S_NODE_OPERATOR_CLOUD_PROVIDER'] = 'TEST'
 
 

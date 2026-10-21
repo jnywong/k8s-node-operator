@@ -9,7 +9,7 @@ from google.cloud import container_v1
 from types import TracebackType
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from k8s_node_operator.base import Nodepool
+    from k8s_autoscaler_plugins.base import Nodepool
 
 class CloudProvider(ABC):
     """
