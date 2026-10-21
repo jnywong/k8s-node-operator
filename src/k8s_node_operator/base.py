@@ -1,3 +1,4 @@
+from __future__ import annotations # see https://peps.python.org/pep-0649/
 import kopf
 from enum import Enum
 from google.cloud import container_v1
