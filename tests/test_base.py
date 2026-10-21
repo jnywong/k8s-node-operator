@@ -1,11 +1,10 @@
 import pytest
 import subprocess
 from k8s_node_operator.base import Node, Nodepool, KubernetesClient
-from .conftest import logger
 from .utils import generate_test_npat_file
 
 # TODO:
-# - request different k8s_nodes fixtures for different cloud providers in future
+# - request different fixture_node_index fixtures for different cloud providers in future
 
 @pytest.mark.asyncio
 class TestNode:
@@ -13,12 +12,12 @@ class TestNode:
     label_selector = 'topology.kubernetes.io/zone=us-central1-b'
     zone = 'us-central1-b'
 
-    async def test_list_node(self, k8s_nodes):
-        node_list = await Node.list_node(index=k8s_nodes)
+    async def test_list_node(self, fixture_node_index):
+        node_list = await Node.list_node(index=fixture_node_index)
         assert len(node_list) == 2
 
-    async def test_list_node_label_selector(self, k8s_nodes):
-        node_list = await Node.list_node(index=k8s_nodes, label_selector=self.label_selector)
+    async def test_list_node_label_selector(self, fixture_node_index):
+        node_list = await Node.list_node(index=fixture_node_index, label_selector=self.label_selector)
         assert len(node_list) == 1
         node = node_list[0]
         assert node.zone == self.zone
@@ -32,16 +31,16 @@ class TestNodepool:
     current_node_count = 1
     target_min_node_count = 1
 
-    async def test_list_nodepool(self, k8s_nodes):
-        node_list = await Node.list_node(index=k8s_nodes)
+    async def test_list_nodepool(self, fixture_node_index):
+        node_list = await Node.list_node(index=fixture_node_index)
         nodepool_list = await Nodepool.list_nodepool(node_list=node_list, target_min_node_count = self.target_min_node_count)
         assert len(nodepool_list) == 2
         nodepool = nodepool_list[0]
         assert nodepool.current_node_count == self.current_node_count
         assert nodepool.target_min_node_count == self.target_min_node_count
 
-    async def test_list_nodepool_label_selector(self, k8s_nodes):
-        node_list = await Node.list_node(index=k8s_nodes, label_selector=self.label_selector)
+    async def test_list_nodepool_label_selector(self, fixture_node_index):
+        node_list = await Node.list_node(index=fixture_node_index, label_selector=self.label_selector)
         nodepool_list = await Nodepool.list_nodepool(node_list=node_list, target_min_node_count = self.target_min_node_count)
         assert len(nodepool_list) == 1
         nodepool = nodepool_list[0]

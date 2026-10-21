@@ -57,10 +57,23 @@ def provider():
     yield provider
 
 @pytest.fixture(scope='session')
-def k8s_nodes():
+def fixture_node_index():
     """
-    Fixture to mock in-memory index of Kubernetes nodes.
+    Fixture of in-memory Kubernetes nodes indexed by kopf.
+
+    TODO: generalise for other cloud providers
     """
-    with open(f'{TEST_DIR}/fixtures/k8s_nodes_index.json', 'r') as f:
+    with open(f'{TEST_DIR}/fixtures/node_index.json', 'r') as f:
+        data = json.load(f)
+    yield data
+
+@pytest.fixture(scope='session')
+def fixture_node():
+    """
+    Fixture of a Kubernetes node to be indexed.
+    
+    TODO: generalise for other cloud providers
+    """
+    with open(f'{TEST_DIR}/fixtures/node.json', 'r') as f:
         data = json.load(f)
     yield data
