@@ -50,9 +50,9 @@ def k8s_nodes(body: kopf.Body, labels: kopf.Labels, logger: kopf.Logger, **kwarg
             if c['status'] == 'True':
                 return {label: value for label, value in labels.items()}
             else:
-                raise ValueError('Skipping: node is not ready.')
+                pass
         else:
-            raise KeyError('Condition type "Ready" not found.')
+            pass
     return None
 
 @kopf.timer('nodepoolallocationtarget', interval=10) # type: ignore[arg-type]
