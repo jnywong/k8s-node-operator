@@ -71,7 +71,7 @@ class Node:
         return node_list
 
     @classmethod
-    def from_dict(cls, node: dict,  label_selector: str = '') -> Node:
+    def from_dict(cls, node: dict,  label_selector: str = '') -> Node | None:
         """
         Construct a Node object from a node_list element of the from_index() method.
         """
@@ -82,7 +82,7 @@ class Node:
             if node[label_selector_name] == label_selector_value:
                 return cls(node_name=node[cls.name_label], region=node[cls.region_label], zone=node[cls.zone_label], label_selector=label_selector, nodepool_name=node[cls.nodepool_label])
             else:
-                pass
+                return None
         else:
             return cls(node_name=node[cls.name_label], region=node[cls.region_label], zone=node[cls.zone_label], label_selector=label_selector, nodepool_name=node[cls.nodepool_label])
 
@@ -104,11 +104,11 @@ class Nodepool:
         self.zone = zone
         self.region = region
         self.label_selector = label_selector
-        self.min_node_count = None
-        self.max_node_count = None
-        self.target_min_node_count = None
-        self.current_node_count = None
-        self.status = {
+        self.min_node_count = 0
+        self.max_node_count = 0
+        self.target_min_node_count = 0
+        self.current_node_count = 0
+        self.status: dict[str, str | int ] = {
             'name': self.name, 
             'min_node_count': self.min_node_count,
             'max_node_count': self.max_node_count,
@@ -138,9 +138,9 @@ class Nodepool:
         async with create_provider(PROVIDER_NAME) as provider:
             for nodepool in unique_nodepool_list:
                 data = await provider.get_nodepool(name=nodepool.name, zone = nodepool.zone, region = nodepool.region)
-                nodepool.min_node_count = data['min_node_count']
-                nodepool.max_node_count = data['max_node_count']
-                nodepool.target_min_node_count = target_min_node_count
+                nodepool.min_node_count = int(data['min_node_count'])
+                nodepool.max_node_count = int(data['max_node_count'])
+                nodepool.target_min_node_count = int(target_min_node_count)
                 nodepool.current_node_count = nodepool.get_current_node_count(node_list)
                 nodepool.status = nodepool.get_status(nodepool)
         return unique_nodepool_list
@@ -178,7 +178,7 @@ class Nodepool:
         async with create_provider(PROVIDER_NAME) as provider:
             await provider.set_min_node_count(self)
 
-    def get_status(self, nodepool: Nodepool) -> dict:
+    def get_status(self, nodepool: Nodepool) -> dict[str, str | int]:
         """
         Get nodepool status as a dictionary.
         """
@@ -197,7 +197,7 @@ class Nodepool:
         Get overall state of nodepool list, with a list of values for each status key.
         """
         # Get list for each status key
-        status = dict.fromkeys(iter(nodepool_list[0].status), [])
+        status: dict = dict.fromkeys(iter(nodepool_list[0].status), [])
         for k, v in status.items():
             values = []
             for nodepool in nodepool_list:

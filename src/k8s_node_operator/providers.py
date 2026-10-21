@@ -1,3 +1,4 @@
+from __future__ import annotations
 import google.auth
 import google.api_core
 import kopf
@@ -6,6 +7,9 @@ import os
 from abc import ABC
 from google.cloud import container_v1
 from types import TracebackType
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from k8s_node_operator.base import Nodepool
 
 class CloudProvider(ABC):
     """
@@ -26,10 +30,10 @@ class CloudProvider(ABC):
         tb: TracebackType | None):
         ...
 
-    async def get_nodepool(self, name: str, zone: str | None = None, region: str | None = None) -> dict:
+    async def get_nodepool(self, name: str, zone: str | None = None, region: str | None = None):
         ...
 
-    async def set_min_node_count(self, nodepool: Nodepool) -> None:
+    async def set_min_node_count(self, nodepool: Nodepool):
         ...
         
 class GCPProvider(CloudProvider):
@@ -117,7 +121,7 @@ class GCPProvider(CloudProvider):
             'max_node_count': nodepool_limit['max']
         } 
     
-    async def list_nodepool(self, label_selector: str = '', zone: str | None = None, region: str | None = None) -> list(dict):
+    async def list_nodepool(self, label_selector: str = '', zone: str | None = None, region: str | None = None) -> list[dict]:
         """
         Convert vendor-specific nodepool list to vendor-agnostic nodepool list.
         """
