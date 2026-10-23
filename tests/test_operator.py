@@ -22,19 +22,36 @@ class TestOperator:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_input, test_output", [
-        ({'target_min_node_count': 0, 'nodepoolSelector': 'topology.kubernetes.io/zone=us-central1-b'}, {'name': 'test-pool-1'}), ({'target_min_node_count': 1, 'nodepoolSelector': 'topology.kubernetes.io/zone=us-central1-c'}, {'name': 'test-pool-2'})])
-    async def test_delete_nodepool_allocation(self, fixture_node_index, test_input, test_output):
+        ({'min_node_count': 0, 'nodepoolSelector': 'topology.kubernetes.io/zone=us-central1-b', 'name': 'test-pool-1'}, {'status': NodepoolState.READY.name, 'raises': False}),
+        ({'min_node_count': 1, 'nodepoolSelector': 'topology.kubernetes.io/zone=us-central1-c', 'name': 'test-pool-2'}, {'status': NodepoolState.UPDATING.name, 'raises': True, 'timeout': False}),
+        ({'min_node_count': 1, 'nodepoolSelector': 'topology.kubernetes.io/zone=us-central1-c', 'name': 'test-pool-2'}, {'status': NodepoolState.ERROR.name, 'raises': True, 'timeout': True})])
+    async def test_delete_nodepool_allocation(self, fixture_node_index, test_input, test_output, mocker):
         """
-        Test parametrized input returns target minimum node count of 0.
-        """
+        Test reconciliation target min node count == cloud provider min node count upon npat deletion.
 
-        spec = {'nodepoolSelector': test_input['nodepoolSelector'], 'plugins': {'alwaysOn': {'minimum': test_input['target_min_node_count']}}}  # TODO: spec.splugins subject to change
-        kopf_patch = kopf.Status
-        kopf_patch.status = {'nodepool_allocation': {}}
-        status = await delete_nodepool_allocation(spec=spec, patch=kopf_patch, k8s_nodes=fixture_node_index, logger=logger)
-        logger.warning(f'{status=}')
-        assert status.get('name', '') == [test_output['name']]
-        assert status.get('target_min_node_count', '') == [0]
+        Parameter tests:
+          1. Reconciliation succeeds, no need to retry
+          2. Reconciliation does not succeed and is below RETRY_LIMIT then raises kopf.TemporaryError
+        """
+        max_node_count = 2
+        target_min_node_count = 0
+        spec = {'nodepoolSelector': test_input['nodepoolSelector'], 'plugins': {'alwaysOn': {'minimum': target_min_node_count}}}  # TODO: spec.plugins subject to change
+        # Mock API calls to cloud provider
+        mock_get_nodepool = mocker.patch('k8s_autoscaler_plugins.providers.TestProvider.get_nodepool')
+        mock_get_nodepool.return_value = {
+            'name': test_input['name'],
+            'min_node_count': test_input['min_node_count'],
+            'max_node_count': max_node_count
+        }
+        if test_output['raises']:
+            with pytest.raises(kopf.TemporaryError):
+                status = await delete_nodepool_allocation(spec=spec, k8s_nodes=fixture_node_index, logger=logger)
+        else:
+            status = await delete_nodepool_allocation(spec=spec, k8s_nodes=fixture_node_index, logger=logger)
+            assert status.get('target_min_node_count', '') == [target_min_node_count]
+            assert status.get('min_node_count', '') == [test_input['min_node_count']]
+            assert status.get('status') == test_output['status']
+
 
     def test_k8s_nodes(self, fixture_node):
         """
@@ -88,8 +105,8 @@ class TestOperator:
                 logger.info(f'{retry=}')
                 await reconcile_provider(spec = spec, status=status, name = self.npat_name, k8s_nodes = fixture_node_index, patch=patch, logger=logger, retry = retry)
                 assert status['nodepool_allocation']['status'] == test_output['status']
-            # TemporaryError if npat in ERROR status
-            with pytest.raises(kopf.TemporaryError):
+            # PermanentError if npat in ERROR status
+            with pytest.raises(kopf.PermanentErrorError):
                 retry += 1
                 logger.info(f'{retry=}')
                 await reconcile_kubernetes(spec=spec, status=status, name = self.npat_name, k8s_nodes=fixture_node_index, patch=patch, logger=logger, retry=retry)
@@ -142,8 +159,8 @@ class TestOperator:
                 logger.info(f'{retry=}')
                 await reconcile_kubernetes(spec=spec, status=status, name = self.npat_name, k8s_nodes=fixture_node_index, patch=patch, logger=logger, retry=retry)
                 assert status['nodepool_allocation']['status'] == test_output['status']
-            # TemporaryError if npat in ERROR status
-            with pytest.raises(kopf.TemporaryError):
+            # PermanentError if npat in ERROR status
+            with pytest.raises(kopf.PermanentError):
                 retry += 1
                 logger.info(f'{retry=}')
                 await reconcile_kubernetes(spec=spec, status=status, name = self.npat_name, k8s_nodes=fixture_node_index, patch=patch, logger=logger, retry=retry)
