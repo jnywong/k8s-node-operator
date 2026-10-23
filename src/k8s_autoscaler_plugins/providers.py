@@ -180,7 +180,7 @@ class GCPProvider(CloudProvider):
         nodepool_limit = self._get_gcp_nodepool_limits(gcp_nodepool)
         # Decide whether to scale
         if target_min_node_count >= nodepool_limit['max']:
-            self.log.info(f'Target minimum node count {target_min_node_count} exceeds maximum node count of {nodepool_limit['max']}.')
+            self.log.debug(f'Target minimum node count {target_min_node_count} exceeds maximum node count of {nodepool_limit['max']}.')
         elif target_min_node_count != nodepool_limit['min']:
             gcp_nodepool_autoscaling = container_v1.NodePoolAutoscaling(
                 enabled = gcp_nodepool.autoscaling.enabled,
@@ -202,9 +202,9 @@ class GCPProvider(CloudProvider):
             # Block until current scaling operation is completed
             if operation:
                 await self.wait_gcp_operation(operation_name = operation.name, zone = nodepool.zone, region = nodepool.region)
-            self.log.info(f'Minimum node count {target_min_node_count} request sent to cloud provider.')
+            self.log.debug(f'Minimum node count {target_min_node_count} request sent to cloud provider.')
         else:
-            self.log.info(f'Minimum node count is already set to {target_min_node_count}.')                
+            self.log.debug(f'Minimum node count is already set to {target_min_node_count}.')                
 
 class TestProvider(CloudProvider):
     """
