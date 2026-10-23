@@ -13,7 +13,8 @@ PROJECT_DIR = Path(__file__).parent.parent
 SRC_DIR = PROJECT_DIR.joinpath('src/k8s_autoscaler_plugins')
 TEST_DIR = PROJECT_DIR.joinpath('tests')
 CRD_FILE = PROJECT_DIR.joinpath('helm/k8s_autoscaler_plugins/crds/nodepool_allocation_target.yaml')
-os.environ['K8S_NODE_OPERATOR_CLOUD_PROVIDER'] = 'TEST'
+os.environ['K8S_AUTOSCALER_PLUGINS_CLOUD_PROVIDER'] = 'TEST'
+os.environ['K8S_AUTOSCALER_PLUGINS_RETRY_LIMIT'] = '2'
 
 
 @pytest.fixture(scope='class')
