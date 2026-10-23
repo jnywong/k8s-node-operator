@@ -74,11 +74,11 @@ async def reconcile_provider(spec: kopf.Spec, status: kopf.Status, name: str, k8
             logger.info(f'[{nodepool.name}] Cloud provider minimum node count target state of {nodepool.min_node_count} reached')
             state = NodepoolState.READY.name
         else:
-            logger.debug(f'[{nodepool.name}] Cloud provider minimum node count target state of {nodepool.min_node_count} not reached')
             if retry < RETRY_LIMIT:
                 logger.error(f'Attempt {retry}: reconcile_provider handler')
                 await nodepool.set_min_node_count(target_min_node_count)
                 state = NodepoolState.UPDATING.name
+                raise kopf.TemporaryError(f'[{nodepool.name}] Cloud provider minimum node count target state of {nodepool.min_node_count} not reached')
             else:
                 npat_status = Nodepool.get_status_list(nodepool_list, NodepoolState.ERROR.name)
                 patch.status['nodepool_allocation'] = npat_status
