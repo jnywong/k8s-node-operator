@@ -22,7 +22,7 @@ async def nodepool_allocation(spec: kopf.Spec, logger: kopf.Logger, k8s_nodes: k
     return npat_status
 
 @kopf.on.delete('nodepoolallocationtarget') # type: ignore[arg-type]
-async def delete_nodepool_allocation(spec: kopf.Spec, k8s_nodes: kopf.Index, logger: kopf.Logger, retries = RETRY_LIMIT, **kwargs: Any) -> Nodepool:
+async def delete_nodepool_allocation(spec: kopf.Spec, k8s_nodes: kopf.Index, logger: kopf.Logger, retries = RETRY_LIMIT, **kwargs: Any) -> dict | None:
     """
     Set minimum node count to 0 on delete.
     """
@@ -39,6 +39,7 @@ async def delete_nodepool_allocation(spec: kopf.Spec, k8s_nodes: kopf.Index, log
             logger.info(f'[{nodepool.name}] Cloud provider minimum node count target state of {nodepool.min_node_count} reached')
             npat_status = Nodepool.get_status_list(nodepool_list, NodepoolState.READY.name)
             return npat_status
+    return None
 
 
 @kopf.index('nodes')
@@ -72,6 +73,8 @@ async def reconcile_provider(spec: kopf.Spec, status: kopf.Status, name: str, k8
         if nodepool.min_node_count == nodepool.target_min_node_count:
             logger.info(f'[{nodepool.name}] Cloud provider minimum node count target state of {nodepool.min_node_count} reached')
             state = NodepoolState.READY.name
+            npat_status = Nodepool.get_status_list(nodepool_list, state)
+            patch.status['nodepool_allocation'] = npat_status
         else:
             if retry < RETRY_LIMIT:
                 logger.error(f'Attempt {retry}: reconcile_provider handler')

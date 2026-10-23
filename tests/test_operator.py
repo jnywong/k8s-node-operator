@@ -106,7 +106,7 @@ class TestOperator:
                 await reconcile_provider(spec = spec, status=status, name = self.npat_name, k8s_nodes = fixture_node_index, patch=patch, logger=logger, retry = retry)
                 assert status['nodepool_allocation']['status'] == test_output['status']
             # PermanentError if npat in ERROR status
-            with pytest.raises(kopf.PermanentErrorError):
+            with pytest.raises(kopf.PermanentError):
                 retry += 1
                 logger.info(f'{retry=}')
                 await reconcile_kubernetes(spec=spec, status=status, name = self.npat_name, k8s_nodes=fixture_node_index, patch=patch, logger=logger, retry=retry)
