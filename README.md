@@ -70,7 +70,7 @@ The following example usage is based on scaling nodes in a GCP GKE cluster nodep
 
    ```bash
    # .env
-   export K8S_NODE_OPERATOR_CLOUD_PROVIDER="GCP"
+   export K8S_AUTOSCALER_PLUGINS_CLOUD_PROVIDER="GCP"
    export GOOGLE_APPLICATION_CREDENTIALS="sa_key.secret.json"
    ```
 

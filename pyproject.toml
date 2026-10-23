@@ -171,6 +171,7 @@ dependencies = [
     "pytest",
     "pytest-asyncio",
     "pytest-cov",
+    "pytest-mock",
     "pytest-raises",
     "pytest-randomly",
     "pytest-xdist",
