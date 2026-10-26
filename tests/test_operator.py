@@ -30,8 +30,8 @@ class TestOperator:
         Test reconciliation target min node count == cloud provider min node count upon npat deletion.
 
         Parameter tests:
-          1. Reconciliation succeeds, no need to retry
-          2. Reconciliation does not succeed and is below RETRY_LIMIT then raises kopf.TemporaryError
+          0. Reconciliation succeeds, no need to retry
+          1. Reconciliation does not succeed and is below RETRY_LIMIT then raises kopf.TemporaryError
         """
         max_node_count = 2
         target_min_node_count = 0
@@ -72,17 +72,17 @@ class TestOperator:
         Test reconciliation target minimum node count state == current cloud provider minimum node count state.
 
         Parameter tests:
-          1. Reconciliation succeeds, no need to retry
-          2. Reconciliation does not succeed and is below RETRY_LIMIT then raises kopf.TemporaryError 
+          0. Reconciliation succeeds, no need to retry
+          1. Reconciliation does not succeed and is below RETRY_LIMIT then raises kopf.TemporaryError
           3. Reconciliation does not succeed and is above RETRY_LIMIT then raises kopf.PermanentError
         """
-        current_node_count = 0  # We're not testing current node count here.
+        current_node_count = 0  # We're not parametrizing current node count here.
         # Set kopf handler inputs
         spec = {'nodepoolSelector': test_input['nodepoolSelector'], 'plugins': {'alwaysOn': {'minimum': test_input['target_min_node_count']}}}
         status = {'nodepool_allocation': {'name': [test_input['name']], 'status': NodepoolState.UPDATING.name, 'min_node_count': [test_input['min_node_count']], 'max_node_count': [test_input['max_node_count']], 'current_node_count': [current_node_count], 'target_min_node_count': [test_input['target_min_node_count']]}}
         patch = kopf.Patch
         patch.status = status
-        # Mock API calls to cloud provider
+        # Mock API calls to cloud provider in base.Nodepool.list_nodepool()
         mock_get_nodepool = mocker.patch('k8s_autoscaler_plugins.providers.TestProvider.get_nodepool')
         mock_get_nodepool.return_value = {
             'name': test_input['name'],
@@ -121,9 +121,9 @@ class TestOperator:
         Test reconciliation target minimum node count state <= current Kubernetes node count state.
 
         Parameter tests:
-          1. Reconciliation succeeds, no need to retry
-          2. Reconciliation does not succeed and is below RETRY_LIMIT then raises kopf.TemporaryError 
-          3. Reconciliation does not succeed and is above RETRY_LIMIT then raises kopf.PermanentError
+          0. Reconciliation succeeds, no need to retry
+          1. Reconciliation does not succeed and is below RETRY_LIMIT then raises kopf.TemporaryError 
+          2. Reconciliation does not succeed and is above RETRY_LIMIT then raises kopf.PermanentError
         """
         # Set cloud provider values (we're not testing for these values here).
         min_node_count = 1
