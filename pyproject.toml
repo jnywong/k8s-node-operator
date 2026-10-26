@@ -102,6 +102,10 @@ exclude = "_version.py"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = ["raises"]
+env = [
+    "K8S_AUTOSCALER_PLUGINS_CLOUD_PROVIDER=TEST",
+    "K8S_AUTOSCALER_PLUGINS_RETRY_LIMIT=2",
+]
 
 [tool.coverage.paths]
 source = [
@@ -171,6 +175,7 @@ dependencies = [
     "pytest",
     "pytest-asyncio",
     "pytest-cov",
+    "pytest-env",
     "pytest-mock",
     "pytest-raises",
     "pytest-randomly",
