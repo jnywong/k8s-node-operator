@@ -10,6 +10,7 @@ from types import TracebackType
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from k8s_autoscaler_plugins.base import Nodepool
+from k8s_autoscaler_plugins.const import ERROR_DELAY
 
 class CloudProvider(ABC):
     """
@@ -96,7 +97,7 @@ class GCPProvider(CloudProvider):
                 'max': gcp_nodepool.autoscaling.max_node_count
             }
         else:
-            raise kopf.TemporaryError('Unable to determine whether nodepool limits are total or zonal.')
+            raise kopf.TemporaryError('Unable to determine whether nodepool limits are total or zonal.', delay=ERROR_DELAY)
 
     async def _get_gcp_nodepool(self, name: str, zone: str | None = None, region: str | None = None) -> container_v1.NodePool:
         """
@@ -180,7 +181,7 @@ class GCPProvider(CloudProvider):
         nodepool_limit = self._get_gcp_nodepool_limits(gcp_nodepool)
         # Decide whether to scale
         if target_min_node_count >= nodepool_limit['max']:
-            self.log.debug(f'Target minimum node count {target_min_node_count} exceeds maximum node count of {nodepool_limit['max']}.')
+            raise kopf.TemporaryError(f'Target minimum node count {target_min_node_count} exceeds maximum node count of {nodepool_limit['max']}.', delay=ERROR_DELAY)
         elif target_min_node_count != nodepool_limit['min']:
             gcp_nodepool_autoscaling = container_v1.NodePoolAutoscaling(
                 enabled = gcp_nodepool.autoscaling.enabled,
@@ -198,7 +199,7 @@ class GCPProvider(CloudProvider):
                 self.log.debug(f'{operation.name=}')
             except google.api_core.exceptions.FailedPrecondition as e:
                 # This can happen e.g. if nodepool state is already busy running another operation. Kopf will retry the handler again on TemporaryError
-                raise kopf.TemporaryError(f"{e}")
+                raise kopf.TemporaryError(f"{e}", delay=ERROR_DELAY)
             # Block until current scaling operation is completed
             if operation:
                 await self.wait_gcp_operation(operation_name = operation.name, zone = nodepool.zone, region = nodepool.region)
