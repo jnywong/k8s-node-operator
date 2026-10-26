@@ -1,8 +1,8 @@
 import kopf
-import time
-from typing import Any, Dict
+from typing import Any
 from k8s_autoscaler_plugins.base import Node, Nodepool, NodepoolState
-from k8s_autoscaler_plugins.const import PROVIDER_NAME, NODEPOOL_LABELS, RETRY_LIMIT, ERROR_DELAY
+from k8s_autoscaler_plugins.const import RETRY_LIMIT, ERROR_DELAY
+from k8s_autoscaler_plugins.utils import get_plugin_manager
 
 # Nodepool allocation target (npat) custom resource
 
@@ -14,6 +14,8 @@ async def nodepool_allocation(spec: kopf.Spec, logger: kopf.Logger, k8s_nodes: k
     """
     # Parse spec
     label_selector = spec.get('nodepoolSelector', {})
+    pm = get_plugin_manager()
+    pm.hook.always_on_scaling(logger=logger)
     target_min_node_count = spec.get('plugins', {}).get('alwaysOn', {}).get('minimum', 0)
     # List nodepools that match the node label selector
     node_list = await Node.list_node(label_selector=label_selector, index=k8s_nodes)

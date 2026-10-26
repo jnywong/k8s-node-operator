@@ -42,10 +42,11 @@ keywords = ["aws", "gcp", "kubernetes", "python"]
 
 # Package dependencies
 dependencies = [
-    "asyncio~=4.0",
-    "kopf~=1.44",
-    "kubernetes~=36.0",
-    "google-cloud-container~=2.65",
+    "asyncio>=4.0",
+    "kopf>=1.44",
+    "kubernetes>=36.0",
+    "google-cloud-container>=2.65",
+    "pluggy>=1.7",
 ]
 
 [project.urls]
@@ -54,7 +55,7 @@ dependencies = [
 "Bug Tracker" = "https://github.com/2i2c-org/k8s-autoscaler-plugins/issues"
 "Documentation" = "https://k8s-autoscaler-plugins.readthedocs.io/en/latest/"
 
-# [project.scripts]
+[project.scripts]
 # script = "<package>.__main__:<entrypoint>"
 
 [project.optional-dependencies]
