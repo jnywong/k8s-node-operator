@@ -14,8 +14,6 @@ async def nodepool_allocation(spec: kopf.Spec, logger: kopf.Logger, k8s_nodes: k
     """
     # Parse spec
     label_selector = spec.get('nodepoolSelector', {})
-    pm = get_plugin_manager()
-    pm.hook.always_on_scaling(logger=logger)
     target_min_node_count = spec.get('plugins', {}).get('alwaysOn', {}).get('minimum', 0)
     # List nodepools that match the node label selector
     node_list = await Node.list_node(label_selector=label_selector, index=k8s_nodes)
@@ -71,6 +69,8 @@ async def reconcile_provider(spec: kopf.Spec, status: kopf.Status, name: str, k8
     label_selector = spec.get('nodepoolSelector', {})
     node_list = await Node.list_node(label_selector=label_selector, index=k8s_nodes)
     nodepool_list = await Nodepool.list_nodepool(node_list, target_min_node_count)
+    pm = get_plugin_manager()
+    pm.hook.evaluate_nodepool(spec=spec, logger=logger)
     for nodepool in nodepool_list: # TODO: add timeout error
         if nodepool.min_node_count == nodepool.target_min_node_count:
             logger.info(f'[{nodepool.name}] Cloud provider minimum node count target state of {nodepool.min_node_count} reached')
