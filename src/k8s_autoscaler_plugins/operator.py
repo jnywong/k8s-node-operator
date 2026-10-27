@@ -70,8 +70,9 @@ async def reconcile_provider(spec: kopf.Spec, status: kopf.Status, name: str, k8
     node_list = await Node.list_node(label_selector=label_selector, index=k8s_nodes)
     nodepool_list = await Nodepool.list_nodepool(node_list, target_min_node_count)
     pm = get_plugin_manager()
-    pm.hook.evaluate_nodepool(spec=spec, logger=logger)
-    for nodepool in nodepool_list: # TODO: add timeout error
+    for nodepool in nodepool_list:
+        # Invoke plugin handlers to update target minimum node count
+        pm.hook.evaluate_nodepool(nodepool=nodepool, spec=spec, logger=logger)
         if nodepool.min_node_count == nodepool.target_min_node_count:
             logger.info(f'[{nodepool.name}] Cloud provider minimum node count target state of {nodepool.min_node_count} reached')
             state = NodepoolState.READY.name
