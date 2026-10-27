@@ -9,7 +9,7 @@ hookimpl = pluggy.HookimplMarker("k8sap")
 
 class HookSpec:
     @hookspec
-    def aggregator(logger):
+    def evaluate_nodepool(logger):
         """
-        Aggregate plugins.
+        Evaluate nodepool object and update target_min_node_count.
         """
