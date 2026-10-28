@@ -2,7 +2,7 @@ import kopf
 from typing import Any
 from k8s_autoscaler_plugins.base import Node, Nodepool, NodepoolState
 from k8s_autoscaler_plugins.const import RETRY_LIMIT, ERROR_DELAY
-from k8s_autoscaler_plugins.utils import get_plugin_manager
+from k8s_autoscaler_plugins.utils import calculate_target_min_node_count_from_plugins
 
 # Nodepool allocation target (npat) custom resource
 
@@ -66,28 +66,27 @@ async def reconcile_provider(spec: kopf.Spec, status: kopf.Status, name: str, k8
     label_selector = spec.get('nodepoolSelector', {})
     node_list = await Node.list_node(label_selector=label_selector, index=k8s_nodes)
     nodepool_list = await Nodepool.list_nodepool(node_list)
-    pm = get_plugin_manager()
     for nodepool in nodepool_list:
         # Invoke plugin handlers to get nodepool target minimum node count
-        for nodepool in pm.hook.evaluate_nodepool(nodepool=nodepool, spec=spec, logger=logger):
-            if nodepool.min_node_count == nodepool.target_min_node_count:
-                logger.info(f'[{nodepool.name}] Cloud provider minimum node count target state of {nodepool.min_node_count} reached')
-                state = NodepoolState.READY.name
+        nodepool = calculate_target_min_node_count_from_plugins(nodepool, spec, logger)
+        if nodepool.min_node_count == nodepool.target_min_node_count:
+            logger.info(f'[{nodepool.name}] Cloud provider minimum node count target state of {nodepool.min_node_count} reached')
+            state = NodepoolState.READY.name
+            npat_status = Nodepool.get_status_list(nodepool_list, state)
+            patch.status['nodepool_allocation'] = npat_status
+        else:
+            if retry < RETRY_LIMIT:
+                logger.error(f'Attempt {retry}: reconcile_provider handler')
+                await nodepool.set_min_node_count(nodepool.target_min_node_count)
+                state = NodepoolState.UPDATING.name
                 npat_status = Nodepool.get_status_list(nodepool_list, state)
                 patch.status['nodepool_allocation'] = npat_status
+                raise kopf.TemporaryError(f'[{nodepool.name}] Cloud provider minimum node count target state of {nodepool.min_node_count} not reached', delay=ERROR_DELAY)
             else:
-                if retry < RETRY_LIMIT:
-                    logger.error(f'Attempt {retry}: reconcile_provider handler')
-                    await nodepool.set_min_node_count(nodepool.target_min_node_count)
-                    state = NodepoolState.UPDATING.name
-                    npat_status = Nodepool.get_status_list(nodepool_list, state)
-                    patch.status['nodepool_allocation'] = npat_status
-                    raise kopf.TemporaryError(f'[{nodepool.name}] Cloud provider minimum node count target state of {nodepool.min_node_count} not reached', delay=ERROR_DELAY)
-                else:
-                    state = NodepoolState.ERROR.name
-                    npat_status = Nodepool.get_status_list(nodepool_list, state)
-                    patch.status['nodepool_allocation'] = npat_status
-                    raise kopf.PermanentError(f'[{nodepool.name}] Reconciliation of target_min_node_count ({nodepool.target_min_node_count}) == cloud provider minimum node count ({nodepool.min_node_count}) timed out after {RETRY_LIMIT} tries.')
+                state = NodepoolState.ERROR.name
+                npat_status = Nodepool.get_status_list(nodepool_list, state)
+                patch.status['nodepool_allocation'] = npat_status
+                raise kopf.PermanentError(f'[{nodepool.name}] Reconciliation of target_min_node_count ({nodepool.target_min_node_count}) == cloud provider minimum node count ({nodepool.min_node_count}) timed out after {RETRY_LIMIT} tries.')
 
 @kopf.timer('nodepoolallocationtarget', interval=10, initial_delay=10, idle=10) # type: ignore[arg-type]
 async def reconcile_kubernetes(spec: kopf.Spec, status: kopf.Status, name: str, k8s_nodes: kopf.Index, patch: kopf.Patch, logger: kopf.Logger, retry: int, **kwargs: Any) -> None:
@@ -99,21 +98,20 @@ async def reconcile_kubernetes(spec: kopf.Spec, status: kopf.Status, name: str, 
     label_selector = spec.get('nodepoolSelector', {})
     node_list = await Node.list_node(label_selector=label_selector, index=k8s_nodes)
     nodepool_list = await Nodepool.list_nodepool(node_list)
-    pm = get_plugin_manager()
     for nodepool in nodepool_list:
-        # Invoke plugin handlers to get nodepool target minimum node count
-        for nodepool in pm.hook.evaluate_nodepool(nodepool=nodepool, spec=spec, logger=logger):
-            if nodepool.target_min_node_count <= nodepool.current_node_count:
-                logger.info(f'[{nodepool.name}] Target minimum node count ({nodepool.target_min_node_count}) <= Kubernetes nodes online ({nodepool.current_node_count}) reached')
-                npat_status = Nodepool.get_status_list(nodepool_list, NodepoolState.READY.name)
+        # Calculate nodepool target minimum node count from plugins
+        nodepool = calculate_target_min_node_count_from_plugins(nodepool, spec, logger)
+        if nodepool.target_min_node_count <= nodepool.current_node_count:
+            logger.info(f'[{nodepool.name}] Target minimum node count ({nodepool.target_min_node_count}) <= Kubernetes nodes online ({nodepool.current_node_count}) reached')
+            npat_status = Nodepool.get_status_list(nodepool_list, NodepoolState.READY.name)
+            patch.status['nodepool_allocation'] = npat_status
+        else:
+            if retry < RETRY_LIMIT:
+                npat_status = Nodepool.get_status_list(nodepool_list, NodepoolState.UPDATING.name)
                 patch.status['nodepool_allocation'] = npat_status
+                logger.info(f'Attempt {retry}: reconcile_kubernetes handler')
+                raise kopf.TemporaryError(f'[{nodepool.name}] Target minimum node count ({nodepool.target_min_node_count}) <= Kubernetes nodes online ({nodepool.current_node_count}) not reached', delay=ERROR_DELAY)
             else:
-                if retry < RETRY_LIMIT:
-                    npat_status = Nodepool.get_status_list(nodepool_list, NodepoolState.UPDATING.name)
-                    patch.status['nodepool_allocation'] = npat_status
-                    logger.info(f'Attempt {retry}: reconcile_kubernetes handler')
-                    raise kopf.TemporaryError(f'[{nodepool.name}] Target minimum node count ({nodepool.target_min_node_count}) <= Kubernetes nodes online ({nodepool.current_node_count}) not reached', delay=ERROR_DELAY)
-                else:
-                    npat_status = Nodepool.get_status_list(nodepool_list, NodepoolState.ERROR.name)
-                    patch.status['nodepool_allocation'] = npat_status
-                    raise kopf.PermanentError(f'[{nodepool.name}] Reconciliation of target_min_node_count ({nodepool.target_min_node_count}) <= Kubernetes current node count ({nodepool.current_node_count}) timed out after {RETRY_LIMIT} tries.')
+                npat_status = Nodepool.get_status_list(nodepool_list, NodepoolState.ERROR.name)
+                patch.status['nodepool_allocation'] = npat_status
+                raise kopf.PermanentError(f'[{nodepool.name}] Reconciliation of target_min_node_count ({nodepool.target_min_node_count}) <= Kubernetes current node count ({nodepool.current_node_count}) timed out after {RETRY_LIMIT} tries.')
