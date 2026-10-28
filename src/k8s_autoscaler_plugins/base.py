@@ -118,7 +118,7 @@ class Nodepool:
         }
 
     @classmethod
-    async def list_nodepool(cls, node_list: list[Node], target_min_node_count: int, label_selector: str = '') -> list[Nodepool]:
+    async def list_nodepool(cls, node_list: list[Node], label_selector: str = '') -> list[Nodepool]:
         """
         List nodepools from a node list.
         """
@@ -141,7 +141,6 @@ class Nodepool:
                 data = await provider.get_nodepool(name=nodepool.name, zone = nodepool.zone, region = nodepool.region)
                 nodepool.min_node_count = int(data['min_node_count'])
                 nodepool.max_node_count = int(data['max_node_count'])
-                nodepool.target_min_node_count = int(target_min_node_count)
                 nodepool.current_node_count = nodepool.get_current_node_count(node_list)
                 nodepool.status = nodepool.get_status(nodepool)
         return unique_nodepool_list
