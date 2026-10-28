@@ -6,12 +6,11 @@ import kopf
 import pluggy
 from k8s_autoscaler_plugins.base import Nodepool
 
-hookspec = pluggy.HookspecMarker("k8sap")
-hookimpl = pluggy.HookimplMarker("k8sap")
+hookspec = pluggy.HookspecMarker("k8s-autoscaler-plugins")
+hookimpl = pluggy.HookimplMarker("k8s-autoscaler-plugins")
 
-class HookSpec:
-    @hookspec
-    def evaluate_nodepool(nodepool: Nodepool, spec: kopf.Spec, logger: kopf.Logger):
-        """
-        Evaluate nodepool object and update target_min_node_count.
-        """
+@hookspec
+def evaluate_nodepool(nodepool: Nodepool, spec: kopf.Spec, logger: kopf.Logger):
+    """
+    Evaluate nodepool object and update target_min_node_count.
+    """
